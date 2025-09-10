@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { fetchProducts } from '../api/products';
-import type { ProductWithBalance } from '../api/types';
+import type { ProductWithBalance, Paged } from '../api/types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { ProductFormModal } from './ProductFormModal';
 import { useQueryClient } from '@tanstack/react-query';
@@ -10,15 +10,21 @@ export function ProductDashboard() {
   const [search, setSearch] = useState('');
   const debounced = useDebouncedValue(search, 300);
   const [openCreate, setOpenCreate] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const qc = useQueryClient();
 
-  const query = useQuery<ProductWithBalance[]>({
-    queryKey: ['products', debounced],
-    queryFn: () => fetchProducts(debounced),
+  const query = useQuery<Paged<ProductWithBalance>>({
+    queryKey: ['products', debounced, page, pageSize],
+    queryFn: () => fetchProducts(debounced, page, pageSize),
     staleTime: 15_000,
   });
 
-  const items = useMemo(() => query.data ?? [], [query.data]);
+  const items = useMemo(() => query.data?.items ?? [], [query.data]);
+  const total = query.data?.total ?? 0;
+  const currentPage = query.data?.page ?? page;
+  const currentPageSize = query.data?.pageSize ?? pageSize;
+  const totalPages = Math.max(Math.ceil(total / currentPageSize), 1);
 
   return (
     <section aria-labelledby="products-heading" className="mt-6">
@@ -51,8 +57,55 @@ export function ProductDashboard() {
           placeholder="Ex.: Caneta ou SKU123"
           className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand sm:max-w-md"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1); // resetar para primeira página ao mudar busca
+          }}
         />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-gray-600">
+          Total: <span className="font-medium">{total}</span>{' '}
+          {total > 0 && (
+            <span>
+              (Página {currentPage} de {totalPages})
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+            disabled={currentPage <= 1 || query.isFetching}
+            onClick={() => setPage((p) => Math.max(p - 1, 1))}
+          >
+            ← Anterior
+          </button>
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+            disabled={currentPage >= totalPages || query.isFetching}
+            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+          >
+            Próxima →
+          </button>
+          <select
+            className="rounded-md border px-2 py-1 text-sm"
+            value={currentPageSize}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setPageSize(next);
+              setPage(1);
+            }}
+          >
+            {[10, 20, 50].map((n) => (
+              <option key={n} value={n}>
+                {n}/página
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="mt-4 overflow-x-auto">
@@ -88,14 +141,14 @@ export function ProductDashboard() {
                 </td>
               </tr>
             )}
-            {!query.isLoading && items.length === 0 && (
+            {!query.isLoading && !query.isError && items.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-sm text-gray-500">
                   Nenhum produto encontrado.
                 </td>
               </tr>
             )}
-            {items.map((p) => {
+            {items.map((p: ProductWithBalance) => {
               const lowStock = p.balance < p.minStock;
               return (
                 <tr key={p.id} className="hover:bg-gray-50 focus-within:bg-gray-50">
@@ -125,6 +178,7 @@ export function ProductDashboard() {
         onOpenChange={setOpenCreate}
         mode="create"
         onSuccess={() => {
+          // Recarregar mantendo filtros e paginação
           qc.invalidateQueries({ queryKey: ['products'] });
         }}
       />
