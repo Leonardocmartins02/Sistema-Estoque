@@ -6,6 +6,8 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { ProductFormModal } from './ProductFormModal';
 import { MovementFormModal } from './MovementFormModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { createMovement } from '../api/movements';
+import { deleteProduct } from '../api/products';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
@@ -240,16 +242,55 @@ export function ProductDashboard() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                      onClick={() => {
-                        setSelectedProductId(p.id);
-                        setOpenMove(true);
-                      }}
-                    >
-                      Movimentar
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedProductId(p.id);
+                          setOpenMove(true);
+                        }}
+                        title="Lançar entrada/saída"
+                      >
+                        Movimentar
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        disabled={p.balance <= 0}
+                        onClick={async () => {
+                          if (p.balance <= 0) return;
+                          const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
+                          if (!ok) return;
+                          try {
+                            await createMovement(p.id, { type: 'OUT', quantity: p.balance });
+                            qc.invalidateQueries({ queryKey: ['products'] });
+                          } catch (e: any) {
+                            alert(e?.message || 'Falha ao zerar saldo');
+                          }
+                        }}
+                        title="Zerar saldo com uma saída"
+                      >
+                        Zerar
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1 text-sm hover:bg-red-50 text-red-700 border-red-300"
+                        onClick={async () => {
+                          const ok = window.confirm(`Excluir produto ${p.name}? Esta ação remove o produto e suas movimentações.`);
+                          if (!ok) return;
+                          try {
+                            await deleteProduct(p.id);
+                            qc.invalidateQueries({ queryKey: ['products'] });
+                          } catch (e: any) {
+                            alert(e?.message || 'Falha ao excluir produto');
+                          }
+                        }}
+                        title="Excluir produto e suas movimentações"
+                      >
+                        Excluir
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

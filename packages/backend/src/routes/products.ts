@@ -148,6 +148,8 @@ router.delete('/:id', async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id } });
   if (!product) return res.status(404).json({ message: 'Produto não encontrado' });
 
+  // Remover movimentações primeiro para evitar violação de FK
+  await prisma.stockMovement.deleteMany({ where: { productId: id } });
   await prisma.product.delete({ where: { id } });
   res.status(204).send();
 });

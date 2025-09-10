@@ -127,29 +127,14 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
               )}
             </div>
 
-            <div>
-              <label htmlFor="minStock" className="block text-sm font-medium text-gray-700">
-                Estoque mínimo*
-              </label>
-              <input
-                id="minStock"
-                type="number"
-                min={0}
-                className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
-                {...register('minStock')}
-              />
-              {errors.minStock && (
-                <p className="mt-1 text-xs text-red-700" role="alert">
-                  {errors.minStock.message}
-                </p>
-              )}
-            </div>
-
             {mode === 'create' && (
               <div>
                 <label htmlFor="initialStock" className="block text-sm font-medium text-gray-700">
                   Estoque inicial (opcional)
                 </label>
+                <p className="mt-1 text-xs text-gray-500">
+                  Se informado, será lançado automaticamente como uma <strong>Entrada (IN)</strong> ao salvar o produto.
+                </p>
                 <input
                   id="initialStock"
                   type="number"
@@ -165,6 +150,27 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
                 )}
               </div>
             )}
+
+            <div>
+              <label htmlFor="minStock" className="block text-sm font-medium text-gray-700">
+                Estoque mínimo*
+              </label>
+              <p className="mt-1 text-xs text-gray-500">
+                Usado apenas para <strong>alerta</strong> na lista quando o saldo ficar abaixo desse valor. Não altera o saldo.
+              </p>
+              <input
+                id="minStock"
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
+                {...register('minStock')}
+              />
+              {errors.minStock && (
+                <p className="mt-1 text-xs text-red-700" role="alert">
+                  {errors.minStock.message}
+                </p>
+              )}
+            </div>
 
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700">
