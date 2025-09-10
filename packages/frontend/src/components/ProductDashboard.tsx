@@ -4,6 +4,7 @@ import { fetchProducts } from '../api/products';
 import type { ProductWithBalance, Paged } from '../api/types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { ProductFormModal } from './ProductFormModal';
+import { MovementFormModal } from './MovementFormModal';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function ProductDashboard() {
@@ -15,6 +16,8 @@ export function ProductDashboard() {
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const qc = useQueryClient();
+  const [openMove, setOpenMove] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   const query = useQuery<Paged<ProductWithBalance>>({
     queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
@@ -152,6 +155,9 @@ export function ProductDashboard() {
               <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Status
               </th>
+              <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
@@ -194,6 +200,18 @@ export function ProductDashboard() {
                       </span>
                     </div>
                   </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedProductId(p.id);
+                        setOpenMove(true);
+                      }}
+                    >
+                      Movimentar
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -207,6 +225,19 @@ export function ProductDashboard() {
         mode="create"
         onSuccess={() => {
           // Recarregar mantendo filtros e paginação
+          qc.invalidateQueries({ queryKey: ['products'] });
+        }}
+      />
+
+      <MovementFormModal
+        open={openMove}
+        onOpenChange={(v) => {
+          setOpenMove(v);
+          if (!v) setSelectedProductId(null);
+        }}
+        productId={selectedProductId || ''}
+        onSuccess={() => {
+          // Atualiza saldos após movimentação
           qc.invalidateQueries({ queryKey: ['products'] });
         }}
       />
