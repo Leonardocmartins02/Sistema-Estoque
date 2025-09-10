@@ -13,6 +13,10 @@ type Props = {
 export function MovementHistoryModal({ open, onOpenChange, productId }: Props) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [type, setType] = useState<'' | 'IN' | 'OUT'>('');
+  const [from, setFrom] = useState<string>('');
+  const [to, setTo] = useState<string>('');
+  const [q, setQ] = useState<string>('');
 
   // Resetar paginação ao abrir para um produto
   useEffect(() => {
@@ -22,8 +26,8 @@ export function MovementHistoryModal({ open, onOpenChange, productId }: Props) {
   }, [open, productId]);
 
   const query = useQuery<Paged<Movement>>({
-    queryKey: ['movements', productId, page, pageSize],
-    queryFn: () => fetchMovements(productId, page, pageSize),
+    queryKey: ['movements', productId, page, pageSize, type, from, to, q],
+    queryFn: () => fetchMovements(productId, page, pageSize, { type, from, to, q }),
     enabled: open && !!productId,
     staleTime: 5_000,
   });
@@ -41,6 +45,62 @@ export function MovementHistoryModal({ open, onOpenChange, productId }: Props) {
           aria-describedby={undefined}
         >
           <Dialog.Title className="text-lg font-medium">Histórico de Movimentações</Dialog.Title>
+
+          {/* Filtros */}
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-medium text-gray-700">Tipo</label>
+              <select
+                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value as '' | 'IN' | 'OUT');
+                  setPage(1);
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="IN">Entrada (IN)</option>
+                <option value="OUT">Saída (OUT)</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-700">De</label>
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                value={from}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-700">Até</label>
+              <input
+                type="date"
+                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                value={to}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="sm:col-span-5">
+              <label className="block text-xs font-medium text-gray-700">Buscar por Observação</label>
+              <input
+                type="search"
+                placeholder="Ex.: ajuste, nota, motivo"
+                className="mt-1 w-full rounded-md border px-2 py-1 text-sm"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+          </div>
 
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-gray-600">

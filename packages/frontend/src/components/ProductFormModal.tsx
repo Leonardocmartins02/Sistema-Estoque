@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createProduct, updateProduct } from '../api/products';
+import { useToast } from './ui/ToastProvider';
 
 const schema = z.object({
   name: z.string().min(1, 'Informe o nome'),
@@ -32,6 +33,7 @@ type Props = {
 
 export function ProductFormModal({ open, onOpenChange, mode, initialId, initialValues, onSuccess }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
+  const { show: showToast } = useToast();
 
   const {
     register,
@@ -61,8 +63,8 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
           className="fixed left-1/2 top-1/2 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow focus:outline-none"
           aria-describedby={undefined}
         >
-          <Dialog.Title className="text-lg font-medium">{title}</Dialog.Title>
-          <Dialog.Description className="mb-4 text-sm text-gray-500">
+          <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
+          <Dialog.Description className="mb-4 text-sm text-gray-600">
             Preencha os campos abaixo. Todos os campos com * são obrigatórios.
           </Dialog.Description>
 
@@ -78,6 +80,7 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
                     initialStock: values.initialStock ?? 0,
                     description: values.description || undefined,
                   });
+                  showToast({ type: 'success', message: 'Produto criado com sucesso.' });
                 } else if (mode === 'edit' && initialId) {
                   await updateProduct(initialId, {
                     name: values.name,
@@ -85,12 +88,14 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
                     minStock: values.minStock,
                     description: values.description || undefined,
                   });
+                  showToast({ type: 'success', message: 'Produto atualizado com sucesso.' });
                 }
                 reset();
                 onOpenChange(false);
                 onSuccess?.();
               } catch (e: any) {
                 setServerError(e?.message || 'Falha ao salvar produto');
+                showToast({ type: 'error', message: e?.message || 'Falha ao salvar produto' });
               }
             })}
             className="space-y-3"

@@ -1,7 +1,16 @@
 import type { Movement, Paged } from './types';
 
-export async function fetchMovements(productId: string, page = 1, pageSize = 20): Promise<Paged<Movement>> {
+export async function fetchMovements(
+  productId: string,
+  page = 1,
+  pageSize = 20,
+  filters?: { type?: 'IN' | 'OUT' | ''; from?: string; to?: string; q?: string },
+): Promise<Paged<Movement>> {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (filters?.type) params.set('type', filters.type);
+  if (filters?.from) params.set('from', filters.from);
+  if (filters?.to) params.set('to', filters.to);
+  if (filters?.q) params.set('q', filters.q);
   const res = await fetch(`/api/products/${productId}/movements?${params.toString()}`);
   if (!res.ok) throw new Error('Falha ao carregar movimentações');
   return res.json();

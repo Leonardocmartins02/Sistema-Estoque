@@ -12,4 +12,5 @@ html, body, #root {
 
 body {
   margin: 0;
+  @apply font-sans bg-gray-50 text-gray-900;
 }

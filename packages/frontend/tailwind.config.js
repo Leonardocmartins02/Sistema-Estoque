@@ -8,9 +8,25 @@ export default {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#2563eb',
-          dark: '#1e40af',
+          DEFAULT: '#4F46E5',
+          dark: '#3730A3',
         },
+      },
+      fontFamily: {
+        sans: [
+          'Inter',
+          'ui-sans-serif',
+          'system-ui',
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'Noto Sans',
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+          'Segoe UI Symbol',
+          'Noto Color Emoji',
+        ],
       },
     },
   },

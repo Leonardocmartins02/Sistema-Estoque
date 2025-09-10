@@ -7,13 +7,16 @@ import { ProductFormModal } from './ProductFormModal';
 import { MovementFormModal } from './MovementFormModal';
 import { MovementHistoryModal } from './MovementHistoryModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from './ui/ToastProvider';
 import { createMovement } from '../api/movements';
 import { deleteProduct } from '../api/products';
+import { ChevronDown, MoreHorizontal, Search } from 'lucide-react';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
   const debounced = useDebouncedValue(search, 300);
   const [openCreate, setOpenCreate] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
@@ -22,6 +25,9 @@ export function ProductDashboard() {
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState(false);
+  const { show: showToast } = useToast();
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'ATTN' | 'OUT'>('ALL');
+  const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
 
   const query = useQuery<Paged<ProductWithBalance>>({
     queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
@@ -35,44 +41,131 @@ export function ProductDashboard() {
   const currentPageSize = query.data?.pageSize ?? pageSize;
   const totalPages = Math.max(Math.ceil(total / currentPageSize), 1);
 
+  // Aplica filtro de status no client-side sobre a página corrente
+  const filteredItems = useMemo(() => {
+    if (statusFilter === 'ALL') return items;
+    return items.filter((p) => {
+      const isOut = p.balance === 0;
+      const isAttn = p.balance > 0 && p.balance < p.minStock;
+      const isOk = p.balance >= p.minStock;
+      if (statusFilter === 'OUT') return isOut;
+      if (statusFilter === 'ATTN') return isAttn;
+      if (statusFilter === 'OK') return isOk;
+      return true;
+    });
+  }, [items, statusFilter]);
+
   return (
     <section aria-labelledby="products-heading" className="mt-6">
+      {/* Barra de ações principal */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 id="products-heading" className="text-lg font-medium">
+          <h2 id="products-heading" className="text-xl font-semibold tracking-tight text-gray-900">
             Produtos
           </h2>
-          <p className="text-sm text-gray-500">Listagem com busca por Nome/SKU</p>
+          <p className="text-sm text-gray-500">Gerencie o cadastro e o estoque</p>
         </div>
         <div>
           <button
             type="button"
-            className="rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
+            className="inline-flex items-center rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
             onClick={() => setOpenCreate(true)}
           >
-            + Novo Produto
+            + Adicionar Produto
           </button>
         </div>
       </div>
 
-      <div className="mt-4">
-        <label htmlFor="search" className="block text-sm font-medium text-gray-700">
-          Buscar por Nome ou SKU
-        </label>
-        <input
-          id="search"
-          name="search"
-          type="search"
-          placeholder="Ex.: Caneta ou SKU123"
-          className="mt-1 w-full rounded-md border border-gray-300 bg-white p-2 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand sm:max-w-md"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1); // resetar para primeira página ao mudar busca
-          }}
-        />
+      {/* Busca e filtros */}
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="w-full sm:max-w-md">
+          <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+            Buscar por Nome ou SKU
+          </label>
+          <div className="relative mt-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              id="search"
+              name="search"
+              type="search"
+              placeholder="Ex.: Caneta ou SKU123"
+              className="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-3 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Botão de Filtros com dropdown */}
+        <div className="relative">
+          <details className="group">
+            <summary className="list-none">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Filtros <ChevronDown className="h-4 w-4" />
+              </button>
+            </summary>
+            <div className="absolute right-0 z-30 mt-2 w-64 rounded-md border bg-white p-3 text-sm shadow-lg">
+              <div className="mb-2 font-medium text-gray-700">Ordenação</div>
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <select
+                  className="rounded-md border px-2 py-1"
+                  value={sortBy}
+                  onChange={(e) => {
+                    const v = e.target.value as 'name' | 'sku' | 'balance';
+                    setSortBy(v);
+                    setPage(1);
+                  }}
+                >
+                  <option value="name">Nome</option>
+                  <option value="sku">SKU</option>
+                  <option value="balance">Saldo</option>
+                </select>
+                <select
+                  className="rounded-md border px-2 py-1"
+                  value={sortDir}
+                  onChange={(e) => {
+                    const v = e.target.value as 'asc' | 'desc';
+                    setSortDir(v);
+                    setPage(1);
+                  }}
+                >
+                  <option value="asc">Crescente</option>
+                  <option value="desc">Decrescente</option>
+                </select>
+              </div>
+
+              <div className="mb-2 font-medium text-gray-700">Status</div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ['ALL', 'Todos'],
+                  ['OK', 'OK'],
+                  ['ATTN', 'Atenção'],
+                  ['OUT', 'Em falta'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setStatusFilter(val)}
+                    className={`rounded-full px-3 py-1 text-xs border ${
+                      statusFilter === val ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
+        </div>
       </div>
 
+      {/* Barra de paginação e ações em massa */}
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-gray-600">
           Total: <span className="font-medium">{total}</span>{' '}
@@ -83,32 +176,6 @@ export function ProductDashboard() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm text-gray-700">Ordenar por:</label>
-          <select
-            className="rounded-md border px-2 py-1 text-sm"
-            value={sortBy}
-            onChange={(e) => {
-              const v = e.target.value as 'name' | 'sku' | 'balance';
-              setSortBy(v);
-              setPage(1);
-            }}
-          >
-            <option value="name">Nome</option>
-            <option value="sku">SKU</option>
-            <option value="balance">Saldo</option>
-          </select>
-          <select
-            className="rounded-md border px-2 py-1 text-sm"
-            value={sortDir}
-            onChange={(e) => {
-              const v = e.target.value as 'asc' | 'desc';
-              setSortDir(v);
-              setPage(1);
-            }}
-          >
-            <option value="asc">Crescente</option>
-            <option value="desc">Decrescente</option>
-          </select>
           <button
             type="button"
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
@@ -151,7 +218,7 @@ export function ProductDashboard() {
               if (items.length === 0) return;
               const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
               if (totalBalance <= 0) {
-                alert('Nenhum item com saldo > 0 nesta página.');
+                showToast({ type: 'info', message: 'Nenhum item com saldo > 0 nesta página.' });
                 return;
               }
               const ok = window.confirm(
@@ -164,9 +231,10 @@ export function ProductDashboard() {
               const results = await Promise.allSettled(ops);
               const failed = results.filter((r) => r.status === 'rejected');
               if (failed.length > 0) {
-                alert(`Falha ao zerar ${failed.length} de ${results.length} produtos.`);
+                showToast({ type: 'error', message: `Falha ao zerar ${failed.length} de ${results.length} produtos.` });
               }
               qc.invalidateQueries({ queryKey: ['products'] });
+              showToast({ type: 'success', message: 'Saldos da página zerados.' });
             }}
             title="Zerar todos os saldos da página"
           >
@@ -186,11 +254,12 @@ export function ProductDashboard() {
               const results = await Promise.allSettled(ops);
               const failed = results.filter((r) => r.status === 'rejected');
               if (failed.length > 0) {
-                alert(`Falha ao excluir ${failed.length} de ${results.length} produtos.`);
+                showToast({ type: 'error', message: `Falha ao excluir ${failed.length} de ${results.length} produtos.` });
               }
               // Voltar para página 1 se a página ficar vazia
               setPage(1);
               qc.invalidateQueries({ queryKey: ['products'] });
+              showToast({ type: 'success', message: 'Produtos da página excluídos.' });
             }}
             title="Excluir todos os produtos da página"
           >
@@ -199,7 +268,8 @@ export function ProductDashboard() {
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      {/* Tabela (desktop/tablet) */}
+      <div className="mt-4 overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -274,33 +344,35 @@ export function ProductDashboard() {
                 </td>
               </tr>
             )}
-            {!query.isLoading && !query.isError && items.length === 0 && (
+            {!query.isLoading && !query.isError && filteredItems.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-sm text-gray-500">
                   Nenhum produto encontrado.
                 </td>
               </tr>
             )}
-            {items.map((p: ProductWithBalance) => {
-              const lowStock = p.balance < p.minStock;
+            {filteredItems.map((p: ProductWithBalance) => {
+              const isOut = p.balance === 0;
+              const isAttn = p.balance > 0 && p.balance < p.minStock;
+              const isOk = p.balance >= p.minStock;
               return (
                 <tr key={p.id} className="hover:bg-gray-50 focus-within:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">{p.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{p.sku}</td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{p.balance}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className={`inline-block h-2.5 w-2.5 rounded-full ${lowStock ? 'bg-red-500' : 'bg-green-500'}`}
-                      />
-                      <span className="text-xs text-gray-700">
-                        {lowStock ? 'Abaixo do mínimo' : 'OK'}
-                      </span>
-                    </div>
+                    {isOk && (
+                      <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">OK</span>
+                    )}
+                    {isAttn && (
+                      <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Atenção</span>
+                    )}
+                    {isOut && (
+                      <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">Em Falta</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
@@ -312,53 +384,78 @@ export function ProductDashboard() {
                       >
                         Movimentar
                       </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                        onClick={() => {
-                          setSelectedProductId(p.id);
-                          setOpenHistory(true);
-                        }}
-                        title="Ver histórico de movimentações"
-                      >
-                        Histórico
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
-                        disabled={p.balance <= 0}
-                        onClick={async () => {
-                          if (p.balance <= 0) return;
-                          const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
-                          if (!ok) return;
-                          try {
-                            await createMovement(p.id, { type: 'OUT', quantity: p.balance });
-                            qc.invalidateQueries({ queryKey: ['products'] });
-                          } catch (e: any) {
-                            alert(e?.message || 'Falha ao zerar saldo');
-                          }
-                        }}
-                        title="Zerar saldo com uma saída"
-                      >
-                        Zerar
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border px-3 py-1 text-sm hover:bg-red-50 text-red-700 border-red-300"
-                        onClick={async () => {
-                          const ok = window.confirm(`Excluir produto ${p.name}? Esta ação remove o produto e suas movimentações.`);
-                          if (!ok) return;
-                          try {
-                            await deleteProduct(p.id);
-                            qc.invalidateQueries({ queryKey: ['products'] });
-                          } catch (e: any) {
-                            alert(e?.message || 'Falha ao excluir produto');
-                          }
-                        }}
-                        title="Excluir produto e suas movimentações"
-                      >
-                        Excluir
-                      </button>
+
+                      <div className="relative">
+                        <details className="group inline-block">
+                          <summary className="list-none">
+                            <button
+                              type="button"
+                              aria-label="Mais ações"
+                              className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </summary>
+                          <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
+                            <button
+                              type="button"
+                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                              onClick={() => {
+                                setEditInitial(p);
+                                setOpenEdit(true);
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                              onClick={() => {
+                                setSelectedProductId(p.id);
+                                setOpenHistory(true);
+                              }}
+                            >
+                              Ver Histórico
+                            </button>
+                            <button
+                              type="button"
+                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                              disabled={p.balance <= 0}
+                              onClick={async () => {
+                                if (p.balance <= 0) return;
+                                const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
+                                if (!ok) return;
+                                try {
+                                  await createMovement(p.id, { type: 'OUT', quantity: p.balance });
+                                  qc.invalidateQueries({ queryKey: ['products'] });
+                                  showToast({ type: 'success', message: `Saldo de ${p.name} zerado com sucesso.` });
+                                } catch (e: any) {
+                                  showToast({ type: 'error', message: e?.message || 'Falha ao zerar saldo' });
+                                }
+                              }}
+                            >
+                              Zerar Estoque
+                            </button>
+                            <button
+                              type="button"
+                              className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
+                              onClick={async () => {
+                                const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
+                                if (!ok) return;
+                                try {
+                                  await deleteProduct(p.id);
+                                  qc.invalidateQueries({ queryKey: ['products'] });
+                                  showToast({ type: 'success', message: `Produto ${p.name} excluído.` });
+                                } catch (e: any) {
+                                  showToast({ type: 'error', message: e?.message || 'Falha ao excluir produto' });
+                                }
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </details>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -368,12 +465,151 @@ export function ProductDashboard() {
         </table>
       </div>
 
+      {/* Cards (mobile) */}
+      <div className="mt-4 space-y-3 md:hidden">
+        {query.isLoading && (
+          <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">Carregando...</div>
+        )}
+        {query.isError && (
+          <div className="rounded-lg border bg-white p-4 text-sm text-red-700">{(query.error as Error)?.message || 'Erro ao carregar produtos'}</div>
+        )}
+        {!query.isLoading && !query.isError && filteredItems.length === 0 && (
+          <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">Nenhum produto encontrado.</div>
+        )}
+        {filteredItems.map((p: ProductWithBalance) => {
+          const isOut = p.balance === 0;
+          const isAttn = p.balance > 0 && p.balance < p.minStock;
+          const isOk = p.balance >= p.minStock;
+          return (
+            <div key={p.id} className="rounded-lg border bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-medium text-gray-900">{p.name}</div>
+                  <div className="text-xs text-gray-500">SKU: {p.sku}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-gray-900">Saldo: {p.balance}</div>
+                  <div className="mt-1">
+                    {isOk && (
+                      <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">OK</span>
+                    )}
+                    {isAttn && (
+                      <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Atenção</span>
+                    )}
+                    {isOut && (
+                      <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">Em Falta</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                  onClick={() => {
+                    setSelectedProductId(p.id);
+                    setOpenMove(true);
+                  }}
+                  title="Lançar entrada/saída"
+                >
+                  Movimentar
+                </button>
+                <details className="relative">
+                  <summary className="list-none">
+                    <button
+                      type="button"
+                      aria-label="Mais ações"
+                      className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </summary>
+                  <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
+                    <button
+                      type="button"
+                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                      onClick={() => {
+                        setEditInitial(p);
+                        setOpenEdit(true);
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedProductId(p.id);
+                        setOpenHistory(true);
+                      }}
+                    >
+                      Ver Histórico
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                      disabled={p.balance <= 0}
+                      onClick={async () => {
+                        if (p.balance <= 0) return;
+                        const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
+                        if (!ok) return;
+                        try {
+                          await createMovement(p.id, { type: 'OUT', quantity: p.balance });
+                          qc.invalidateQueries({ queryKey: ['products'] });
+                          showToast({ type: 'success', message: `Saldo de ${p.name} zerado com sucesso.` });
+                        } catch (e: any) {
+                          showToast({ type: 'error', message: e?.message || 'Falha ao zerar saldo' });
+                        }
+                      }}
+                    >
+                      Zerar Estoque
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
+                      onClick={async () => {
+                        const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
+                        if (!ok) return;
+                        try {
+                          await deleteProduct(p.id);
+                          qc.invalidateQueries({ queryKey: ['products'] });
+                          showToast({ type: 'success', message: `Produto ${p.name} excluído.` });
+                        } catch (e: any) {
+                          showToast({ type: 'error', message: e?.message || 'Falha ao excluir produto' });
+                        }
+                      }}
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <ProductFormModal
         open={openCreate}
         onOpenChange={setOpenCreate}
         mode="create"
         onSuccess={() => {
-          // Recarregar mantendo filtros e paginação
+          qc.invalidateQueries({ queryKey: ['products'] });
+        }}
+      />
+      <ProductFormModal
+        open={openEdit}
+        onOpenChange={setOpenEdit}
+        mode="edit"
+        initialId={editInitial?.id}
+        initialValues={{
+          name: editInitial?.name,
+          sku: editInitial?.sku,
+          minStock: editInitial?.minStock,
+          description: (editInitial as any)?.description,
+        }}
+        onSuccess={() => {
+          setEditInitial(null);
           qc.invalidateQueries({ queryKey: ['products'] });
         }}
       />

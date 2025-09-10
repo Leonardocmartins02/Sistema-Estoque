@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createMovement } from '../api/movements';
+import { useToast } from './ui/ToastProvider';
 
 const schema = z.object({
   type: z.enum(['IN', 'OUT'], { required_error: 'Selecione o tipo' }),
@@ -27,6 +28,7 @@ type Props = {
 
 export function MovementFormModal({ open, onOpenChange, productId, onSuccess }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
+  const { show: showToast } = useToast();
 
   const {
     register,
@@ -50,8 +52,10 @@ export function MovementFormModal({ open, onOpenChange, productId, onSuccess }: 
       reset();
       onOpenChange(false);
       onSuccess?.();
+      showToast({ type: 'success', message: 'Movimentação lançada com sucesso.' });
     } catch (e: any) {
       setServerError(e?.message || 'Falha ao lançar movimentação');
+      showToast({ type: 'error', message: e?.message || 'Falha ao lançar movimentação' });
     }
   }
 
@@ -63,8 +67,8 @@ export function MovementFormModal({ open, onOpenChange, productId, onSuccess }: 
           className="fixed left-1/2 top-1/2 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow focus:outline-none"
           aria-describedby={undefined}
         >
-          <Dialog.Title className="text-lg font-medium">Movimentar Estoque</Dialog.Title>
-          <Dialog.Description className="mb-4 text-sm text-gray-500">
+          <Dialog.Title className="text-lg font-semibold">Movimentar Estoque</Dialog.Title>
+          <Dialog.Description className="mb-4 text-sm text-gray-600">
             Lance uma entrada (IN) ou saída (OUT) para este produto.
           </Dialog.Description>
 

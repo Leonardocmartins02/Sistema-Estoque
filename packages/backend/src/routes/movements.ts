@@ -13,17 +13,41 @@ const movementSchema = z.object({
 
 router.get('/:id/movements', async (req, res) => {
   const id = req.params.id;
-  const page = Number(req.query.page || 1);
-  const pageSize = Math.min(Number(req.query.pageSize || 20), 100);
+  const page = Math.max(Number(req.query.page || 1), 1);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 20), 1), 100);
+  const type = String(req.query.type || '').trim(); // IN | OUT | ''
+  const from = String(req.query.from || '').trim(); // ISO date
+  const to = String(req.query.to || '').trim(); // ISO date
+  const q = String(req.query.q || '').trim(); // substring of note
+
+  const where: any = { productId: id };
+  if (type === 'IN' || type === 'OUT') {
+    where.type = type;
+  }
+  if (from) {
+    const d = new Date(from);
+    if (!isNaN(d.getTime())) {
+      where.date = { ...(where.date || {}), gte: d };
+    }
+  }
+  if (to) {
+    const d = new Date(to);
+    if (!isNaN(d.getTime())) {
+      where.date = { ...(where.date || {}), lte: d };
+    }
+  }
+  if (q) {
+    where.note = { contains: q, mode: 'insensitive' };
+  }
 
   const [items, total] = await Promise.all([
     prisma.stockMovement.findMany({
-      where: { productId: id },
+      where,
       orderBy: { date: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
-    prisma.stockMovement.count({ where: { productId: id } }),
+    prisma.stockMovement.count({ where }),
   ]);
 
   res.json({ items, total, page, pageSize });
