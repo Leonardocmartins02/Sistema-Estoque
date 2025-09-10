@@ -7,16 +7,23 @@ const router = Router();
 router.get('/', async (req, res) => {
   const search = String(req.query.search || '').trim();
 
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { sku: { contains: search, mode: 'insensitive' } },
-        ],
-      }
-    : {};
+  // Normalize function to remove diacritics and lowercase
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
 
-  const products = await prisma.product.findMany({ where, orderBy: { name: 'asc' } });
+  let products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
+
+  if (search) {
+    const nQuery = normalize(search);
+    products = products.filter((p) => {
+      const nName = normalize(p.name);
+      const nSku = normalize(p.sku);
+      return nName.includes(nQuery) || nSku.includes(nQuery);
+    });
+  }
 
   // Calculate balance per product
   const productsWithBalance = await Promise.all(
