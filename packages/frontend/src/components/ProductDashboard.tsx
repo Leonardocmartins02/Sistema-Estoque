@@ -121,28 +121,32 @@ export function ProductDashboard() {
   }, [items, statusFilter]);
 
   return (
-    <section aria-labelledby="products-heading" className="mt-6">
+    <section aria-labelledby="products-heading" className="mt-8">
       {/* Barra de ações principal */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3">
         <div>
-          <h2 id="products-heading" className="text-xl font-semibold tracking-tight text-gray-900">
+          <h2 id="products-heading" className="text-3xl font-semibold tracking-tight text-gray-900">
             Produtos
           </h2>
           <p className="text-sm text-gray-500">Gerencie o cadastro e o estoque</p>
-        </div>
-        <div>
-          <button
-            type="button"
-            className="inline-flex items-center rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
-            onClick={() => setOpenCreate(true)}
-          >
-            + Adicionar Produto
-          </button>
+          <div className="mt-6">
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full bg-brand px-4 py-2 text-white text-sm shadow-sm hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
+              onClick={() => setOpenCreate(true)}
+            >
+              + Adicionar Produto
+            </button>
+          </div>
+
+      {/* Barra de paginação e ações em massa — movida para baixo da tabela */}
         </div>
       </div>
 
-      {/* Busca e filtros */}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      {/* (removido) Busca e filtros original — será renderizado na faixa da paginação */}
+
+      {/* Faixa com Busca + Filtros (no lugar do total/paginação) */}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="w-full sm:max-w-md">
           <label htmlFor="search" className="block text-sm font-medium text-gray-700">
             Buscar por Nome ou SKU
@@ -154,7 +158,7 @@ export function ProductDashboard() {
               name="search"
               type="search"
               placeholder="Ex.: Caneta ou SKU123"
-              className="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-3 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
+              className="w-full rounded-md border border-gray-300 bg-white py-2 pl-9 pr-3 shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand text-sm placeholder:text-xs"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -169,7 +173,7 @@ export function ProductDashboard() {
           <details className="group inline-block">
             <summary
               aria-label="Abrir filtros"
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-full border bg-white px-3.5 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
             >
               Filtros <ChevronDown className="h-4 w-4" />
             </summary>
@@ -281,111 +285,9 @@ export function ProductDashboard() {
         </div>
       </div>
 
-      {/* Barra de paginação e ações em massa */}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-gray-600">
-          Total: <span className="font-medium">{total}</span>{' '}
-          {total > 0 && (
-            <span>
-              (Página {currentPage} de {totalPages})
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            disabled={currentPage <= 1 || query.isFetching}
-            onClick={() => setPage((p) => Math.max(p - 1, 1))}
-          >
-            ← Anterior
-          </button>
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            disabled={currentPage >= totalPages || query.isFetching}
-            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-          >
-            Próxima →
-          </button>
-          <select
-            className="rounded-md border px-2 py-1 text-sm"
-            value={currentPageSize}
-            onChange={(e) => {
-              const next = Number(e.target.value);
-              setPageSize(next);
-              setPage(1);
-            }}
-          >
-            {[10, 20, 50].map((n) => (
-              <option key={n} value={n}>
-                {n}/página
-              </option>
-            ))}
-          </select>
-
-          {/* Ações em massa na página atual */}
-          <span className="ml-2 h-5 w-px bg-gray-300" aria-hidden="true" />
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
-            disabled={items.length === 0 || query.isFetching}
-            onClick={async () => {
-              if (items.length === 0) return;
-              const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
-              if (totalBalance <= 0) {
-                showToast({ type: 'info', message: 'Nenhum item com saldo > 0 nesta página.' });
-                return;
-              }
-              const ok = window.confirm(
-                `Zerar todos os produtos desta página? Será lançada SAÍDA (OUT) total de ${totalBalance}.`
-              );
-              if (!ok) return;
-              const ops = items
-                .filter((it) => it.balance > 0)
-                .map((it) => createMovement(it.id, { type: 'OUT', quantity: it.balance }));
-              const results = await Promise.allSettled(ops);
-              const failed = results.filter((r) => r.status === 'rejected');
-              if (failed.length > 0) {
-                showToast({ type: 'error', message: `Falha ao zerar ${failed.length} de ${results.length} produtos.` });
-              }
-              qc.invalidateQueries({ queryKey: ['products'] });
-              showToast({ type: 'success', message: 'Saldos da página zerados.' });
-            }}
-            title="Zerar todos os saldos da página"
-          >
-            Zerar página
-          </button>
-          <button
-            type="button"
-            className="rounded-md border px-3 py-1 text-sm hover:bg-red-50 text-red-700 border-red-300 disabled:opacity-50"
-            disabled={items.length === 0 || query.isFetching}
-            onClick={async () => {
-              if (items.length === 0) return;
-              const ok = window.confirm(
-                `Excluir todos os produtos desta página? Esta ação remove os produtos e suas movimentações.`
-              );
-              if (!ok) return;
-              const ops = items.map((it) => deleteProduct(it.id));
-              const results = await Promise.allSettled(ops);
-              const failed = results.filter((r) => r.status === 'rejected');
-              if (failed.length > 0) {
-                showToast({ type: 'error', message: `Falha ao excluir ${failed.length} de ${results.length} produtos.` });
-              }
-              // Voltar para página 1 se a página ficar vazia
-              setPage(1);
-              qc.invalidateQueries({ queryKey: ['products'] });
-              showToast({ type: 'success', message: 'Produtos da página excluídos.' });
-            }}
-            title="Excluir todos os produtos da página"
-          >
-            Excluir página
-          </button>
-        </div>
-      </div>
-
       {/* Tabela (desktop/tablet) */}
-      <div className="mt-4 overflow-x-auto hidden md:block">
+      <div className="mt-6 hidden md:block">
+        <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -445,7 +347,7 @@ export function ProductDashboard() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-200">
             {query.isLoading && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-sm text-gray-500">
@@ -504,7 +406,7 @@ export function ProductDashboard() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                        className="rounded-full border px-3.5 py-1.5 text-sm hover:bg-gray-50"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedProductId(p.id);
@@ -533,7 +435,7 @@ export function ProductDashboard() {
                           <>
                             <button
                               type="button"
-                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                              className="block w-full rounded-md px-3 py-2.5 text-left hover:bg-gray-50"
                               onClick={() => {
                                 setEditInitial(p);
                                 setOpenEdit(true);
@@ -543,7 +445,7 @@ export function ProductDashboard() {
                             </button>
                             <button
                               type="button"
-                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                              className="block w-full rounded-md px-3 py-2.5 text-left hover:bg-gray-50"
                               onClick={() => {
                                 setSelectedProductId(p.id);
                                 setOpenHistory(true);
@@ -553,7 +455,7 @@ export function ProductDashboard() {
                             </button>
                             <button
                               type="button"
-                              className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                              className="block w-full rounded-md px-3 py-2.5 text-left hover:bg-gray-50 disabled:opacity-50"
                               disabled={p.balance <= 0}
                               onClick={async () => {
                                 if (p.balance <= 0) return;
@@ -572,7 +474,7 @@ export function ProductDashboard() {
                             </button>
                             <button
                               type="button"
-                              className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
+                              className="block w-full rounded-md px-3 py-2.5 text-left text-red-700 hover:bg-red-50"
                               onClick={async () => {
                                 const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
                                 if (!ok) return;
@@ -608,6 +510,109 @@ export function ProductDashboard() {
             })}
           </tbody>
         </table>
+        </div>
+      </div>
+
+      {/* Barra de paginação e ações em massa (abaixo da tabela) */}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-gray-600">
+          Total: <span className="font-medium">{total}</span>{' '}
+          {total > 0 && (
+            <span>
+              (Página {currentPage} de {totalPages})
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="rounded-full border px-3.5 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+            disabled={currentPage <= 1 || query.isFetching}
+            onClick={() => setPage((p) => Math.max(p - 1, 1))}
+          >
+            ← Anterior
+          </button>
+          <button
+            type="button"
+            className="rounded-full border px-3.5 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+            disabled={currentPage >= totalPages || query.isFetching}
+            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+          >
+            Próxima →
+          </button>
+          <select
+            className="rounded-md border px-2.5 py-2 text-sm"
+            value={currentPageSize}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setPageSize(next);
+              setPage(1);
+            }}
+          >
+            {[10, 20, 50].map((n) => (
+              <option key={n} value={n}>
+                {n}/página
+              </option>
+            ))}
+          </select>
+
+          {/* Ações em massa na página atual */}
+          <span className="ml-2 h-5 w-px bg-gray-300" aria-hidden="true" />
+          <button
+            type="button"
+            className="rounded-full border px-3.5 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+            disabled={items.length === 0 || query.isFetching}
+            onClick={async () => {
+              if (items.length === 0) return;
+              const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
+              if (totalBalance <= 0) {
+                showToast({ type: 'info', message: 'Nenhum item com saldo > 0 nesta página.' });
+                return;
+              }
+              const ok = window.confirm(
+                `Zerar todos os produtos desta página? Será lançada SAÍDA (OUT) total de ${totalBalance}.`
+              );
+              if (!ok) return;
+              const ops = items
+                .filter((it) => it.balance > 0)
+                .map((it) => createMovement(it.id, { type: 'OUT', quantity: it.balance }));
+              const results = await Promise.allSettled(ops);
+              const failed = results.filter((r) => r.status === 'rejected');
+              if (failed.length > 0) {
+                showToast({ type: 'error', message: `Falha ao zerar ${failed.length} de ${results.length} produtos.` });
+              }
+              qc.invalidateQueries({ queryKey: ['products'] });
+              showToast({ type: 'success', message: 'Saldos da página zerados.' });
+            }}
+            title="Zerar todos os saldos da página"
+          >
+            Zerar página
+          </button>
+          <button
+            type="button"
+            className="rounded-full border px-3.5 py-2 text-sm hover:bg-red-50 text-red-700 border-red-300 disabled:opacity-50"
+            disabled={items.length === 0 || query.isFetching}
+            onClick={async () => {
+              if (items.length === 0) return;
+              const ok = window.confirm(
+                `Excluir todos os produtos desta página? Esta ação remove os produtos e suas movimentações.`
+              );
+              if (!ok) return;
+              const ops = items.map((it) => deleteProduct(it.id));
+              const results = await Promise.allSettled(ops);
+              const failed = results.filter((r) => r.status === 'rejected');
+              if (failed.length > 0) {
+                showToast({ type: 'error', message: `Falha ao excluir ${failed.length} de ${results.length} produtos.` });
+              }
+              setPage(1);
+              qc.invalidateQueries({ queryKey: ['products'] });
+              showToast({ type: 'success', message: 'Produtos da página excluídos.' });
+            }}
+            title="Excluir todos os produtos da página"
+          >
+            Excluir página
+          </button>
+        </div>
       </div>
 
       {/* Cards (mobile) */}
@@ -650,7 +655,7 @@ export function ProductDashboard() {
               <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
-                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                  className="rounded-full border px-3.5 py-1.5 text-sm hover:bg-gray-50"
                   onClick={() => {
                     setSelectedProductId(p.id);
                     setOpenMove(true);
@@ -677,7 +682,7 @@ export function ProductDashboard() {
                     <>
                       <button
                         type="button"
-                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"
                         onClick={() => {
                           setEditInitial(p);
                           setOpenEdit(true);
@@ -687,7 +692,7 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"
                         onClick={() => {
                           setSelectedProductId(p.id);
                           setOpenHistory(true);
@@ -697,7 +702,7 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
                         disabled={p.balance <= 0}
                         onClick={async () => {
                           if (p.balance <= 0) return;
@@ -716,7 +721,7 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
+                        className="block w-full rounded-md px-2.5 py-2 text-left text-red-700 hover:bg-red-50"
                         onClick={async () => {
                           const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
                           if (!ok) return;
