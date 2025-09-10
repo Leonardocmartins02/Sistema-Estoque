@@ -202,21 +202,21 @@ export function ProductDashboard() {
           <tbody className="divide-y divide-gray-200 bg-white">
             {query.isLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-sm text-gray-500">
+                <td colSpan={5} className="px-4 py-6 text-sm text-gray-500">
                   Carregando...
                 </td>
               </tr>
             )}
             {query.isError && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-sm text-red-700">
+                <td colSpan={5} className="px-4 py-6 text-sm text-red-700">
                   {(query.error as Error)?.message || 'Erro ao carregar produtos'}
                 </td>
               </tr>
             )}
             {!query.isLoading && !query.isError && items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-sm text-gray-500">
+                <td colSpan={5} className="px-4 py-6 text-sm text-gray-500">
                   Nenhum produto encontrado.
                 </td>
               </tr>
