@@ -143,14 +143,53 @@ export function ProductDashboard() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Nome do Produto
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 cursor-pointer select-none"
+                onClick={() => {
+                  setPage(1);
+                  if (sortBy === 'name') {
+                    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortBy('name');
+                    setSortDir('asc');
+                  }
+                }}
+                title="Ordenar por Nome"
+              >
+                Nome do Produto {sortBy === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
               </th>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                SKU
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 cursor-pointer select-none"
+                onClick={() => {
+                  setPage(1);
+                  if (sortBy === 'sku') {
+                    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortBy('sku');
+                    setSortDir('asc');
+                  }
+                }}
+                title="Ordenar por SKU"
+              >
+                SKU {sortBy === 'sku' && (sortDir === 'asc' ? '↑' : '↓')}
               </th>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Saldo Atual
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 cursor-pointer select-none"
+                onClick={() => {
+                  setPage(1);
+                  if (sortBy === 'balance') {
+                    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortBy('balance');
+                    setSortDir('asc');
+                  }
+                }}
+                title="Ordenar por Saldo"
+              >
+                Saldo Atual {sortBy === 'balance' && (sortDir === 'asc' ? '↑' : '↓')}
               </th>
               <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Status
