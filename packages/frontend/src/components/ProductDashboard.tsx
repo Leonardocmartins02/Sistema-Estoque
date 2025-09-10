@@ -5,6 +5,7 @@ import type { ProductWithBalance, Paged } from '../api/types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { ProductFormModal } from './ProductFormModal';
 import { MovementFormModal } from './MovementFormModal';
+import { MovementHistoryModal } from './MovementHistoryModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { createMovement } from '../api/movements';
 import { deleteProduct } from '../api/products';
@@ -20,6 +21,7 @@ export function ProductDashboard() {
   const qc = useQueryClient();
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [openHistory, setOpenHistory] = useState(false);
 
   const query = useQuery<Paged<ProductWithBalance>>({
     queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
@@ -312,6 +314,17 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
+                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedProductId(p.id);
+                          setOpenHistory(true);
+                        }}
+                        title="Ver histórico de movimentações"
+                      >
+                        Histórico
+                      </button>
+                      <button
+                        type="button"
                         className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
                         disabled={p.balance <= 0}
                         onClick={async () => {
@@ -376,6 +389,15 @@ export function ProductDashboard() {
           // Atualiza saldos após movimentação
           qc.invalidateQueries({ queryKey: ['products'] });
         }}
+      />
+
+      <MovementHistoryModal
+        open={openHistory}
+        onOpenChange={(v) => {
+          setOpenHistory(v);
+          if (!v) setSelectedProductId(null);
+        }}
+        productId={selectedProductId || ''}
       />
     </section>
   );
