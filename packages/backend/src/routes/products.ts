@@ -6,6 +6,8 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   const search = String(req.query.search || '').trim();
+  const page = Math.max(Number(req.query.page || 1), 1);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 10), 1), 50);
 
   // Normalize function to remove diacritics and lowercase
   const normalize = (s: string) =>
@@ -39,7 +41,13 @@ router.get('/', async (req, res) => {
     })
   );
 
-  res.json(productsWithBalance);
+  // Pagination in memory (sufficient for small datasets)
+  const total = productsWithBalance.length;
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const items = productsWithBalance.slice(start, end);
+
+  res.json({ items, total, page, pageSize });
 });
 
 const productSchema = z.object({
