@@ -4,12 +4,16 @@ export async function fetchProducts(
   search: string,
   page = 1,
   pageSize = 10,
+  sortBy: 'name' | 'sku' | 'balance' = 'name',
+  sortDir: 'asc' | 'desc' = 'asc',
 ): Promise<{ items: ProductWithBalance[]; total: number; page: number; pageSize: number }> {
   const term = search.trim();
   const params = new URLSearchParams();
   if (term) params.set('search', term);
   params.set('page', String(page));
   params.set('pageSize', String(pageSize));
+  params.set('sortBy', sortBy);
+  params.set('sortDir', sortDir);
   const qs = params.toString();
   const url = `/api/products?${qs}`;
 

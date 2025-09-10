@@ -12,11 +12,13 @@ export function ProductDashboard() {
   const [openCreate, setOpenCreate] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const qc = useQueryClient();
 
   const query = useQuery<Paged<ProductWithBalance>>({
-    queryKey: ['products', debounced, page, pageSize],
-    queryFn: () => fetchProducts(debounced, page, pageSize),
+    queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
+    queryFn: () => fetchProducts(debounced, page, pageSize, sortBy, sortDir),
     staleTime: 15_000,
   });
 
@@ -73,7 +75,33 @@ export function ProductDashboard() {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-sm text-gray-700">Ordenar por:</label>
+          <select
+            className="rounded-md border px-2 py-1 text-sm"
+            value={sortBy}
+            onChange={(e) => {
+              const v = e.target.value as 'name' | 'sku' | 'balance';
+              setSortBy(v);
+              setPage(1);
+            }}
+          >
+            <option value="name">Nome</option>
+            <option value="sku">SKU</option>
+            <option value="balance">Saldo</option>
+          </select>
+          <select
+            className="rounded-md border px-2 py-1 text-sm"
+            value={sortDir}
+            onChange={(e) => {
+              const v = e.target.value as 'asc' | 'desc';
+              setSortDir(v);
+              setPage(1);
+            }}
+          >
+            <option value="asc">Crescente</option>
+            <option value="desc">Decrescente</option>
+          </select>
           <button
             type="button"
             className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
