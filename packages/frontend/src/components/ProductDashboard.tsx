@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchProducts } from '../api/products';
 import type { ProductWithBalance, Paged } from '../api/types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
@@ -9,8 +9,9 @@ import { MovementHistoryModal } from './MovementHistoryModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './ui/ToastProvider';
 import { createMovement } from '../api/movements';
-import { deleteProduct } from '../api/products';
-import { ChevronDown, MoreHorizontal, Search } from 'lucide-react';
+import { deleteProduct, createProduct } from '../api/products';
+import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
@@ -101,46 +102,75 @@ export function ProductDashboard() {
 
         {/* Botão de Filtros com dropdown */}
         <div className="relative">
-          <details className="group">
-            <summary className="list-none">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50"
-              >
-                Filtros <ChevronDown className="h-4 w-4" />
-              </button>
+          <details className="group inline-block">
+            <summary
+              aria-label="Abrir filtros"
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
+            >
+              Filtros <ChevronDown className="h-4 w-4" />
             </summary>
-            <div className="absolute right-0 z-30 mt-2 w-64 rounded-md border bg-white p-3 text-sm shadow-lg">
-              <div className="mb-2 font-medium text-gray-700">Ordenação</div>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <select
-                  className="rounded-md border px-2 py-1"
-                  value={sortBy}
-                  onChange={(e) => {
-                    const v = e.target.value as 'name' | 'sku' | 'balance';
-                    setSortBy(v);
-                    setPage(1);
-                  }}
-                >
-                  <option value="name">Nome</option>
-                  <option value="sku">SKU</option>
-                  <option value="balance">Saldo</option>
-                </select>
-                <select
-                  className="rounded-md border px-2 py-1"
-                  value={sortDir}
-                  onChange={(e) => {
-                    const v = e.target.value as 'asc' | 'desc';
-                    setSortDir(v);
-                    setPage(1);
-                  }}
-                >
-                  <option value="asc">Crescente</option>
-                  <option value="desc">Decrescente</option>
-                </select>
+            <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border bg-white p-3 text-sm shadow-xl">
+              <div className="mb-3">
+                <div className="mb-2 font-medium text-gray-800">Ordenação</div>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md border bg-gray-50 p-1">
+                    {([
+                      ['name', 'Nome'],
+                      ['sku', 'SKU'],
+                      ['balance', 'Saldo'],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(key);
+                          setPage(1);
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium rounded ${
+                          sortBy === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                        aria-pressed={sortBy === key}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="inline-flex rounded-md border bg-gray-50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortDir('asc');
+                        setPage(1);
+                      }}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${
+                        sortDir === 'asc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                      aria-pressed={sortDir === 'asc'}
+                      title="Crescente"
+                    >
+                      <ArrowUpWideNarrow className="h-3.5 w-3.5" /> ASC
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSortDir('desc');
+                        setPage(1);
+                      }}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${
+                        sortDir === 'desc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                      aria-pressed={sortDir === 'desc'}
+                      title="Decrescente"
+                    >
+                      <ArrowDownNarrowWide className="h-3.5 w-3.5" /> DESC
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="mb-2 font-medium text-gray-700">Status</div>
+              <div className="my-3 h-px bg-gray-200" />
+
+              <div className="mb-2 font-medium text-gray-800">Status</div>
               <div className="flex flex-wrap gap-2">
                 {([
                   ['ALL', 'Todos'],
@@ -152,13 +182,35 @@ export function ProductDashboard() {
                     key={val}
                     type="button"
                     onClick={() => setStatusFilter(val)}
-                    className={`rounded-full px-3 py-1 text-xs border ${
-                      statusFilter === val ? 'border-brand bg-brand text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    className={`rounded-full px-3 py-1.5 text-xs border transition ${
+                      statusFilter === val
+                        ? 'border-brand bg-brand text-white shadow-sm'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                     }`}
+                    aria-pressed={statusFilter === val}
                   >
                     {label}
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                  <ArrowUpDown className="h-3.5 w-3.5" /> Ajuste os filtros e a lista será atualizada.
+                </span>
+                <button
+                  type="button"
+                  className="rounded-md border px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  onClick={() => {
+                    setSortBy('name');
+                    setSortDir('asc');
+                    setStatusFilter('ALL');
+                    setPage(1);
+                  }}
+                  title="Limpar filtros"
+                >
+                  Limpar
+                </button>
               </div>
             </div>
           </details>
@@ -268,8 +320,8 @@ export function ProductDashboard() {
         </div>
       </div>
 
-      {/* Tabela (desktop grande) */}
-      <div className="mt-4 overflow-x-auto hidden lg:block">
+      {/* Tabela (desktop/tablet) */}
+      <div className="mt-4 overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -462,8 +514,8 @@ export function ProductDashboard() {
         </table>
       </div>
 
-      {/* Cards (mobile e tablets) */}
-      <div className="mt-4 space-y-3 lg:hidden">
+      {/* Cards (mobile) */}
+      <div className="mt-4 space-y-3 md:hidden">
         {query.isLoading && (
           <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">Carregando...</div>
         )}
