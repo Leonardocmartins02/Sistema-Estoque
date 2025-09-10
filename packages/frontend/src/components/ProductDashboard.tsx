@@ -29,6 +29,70 @@ export function ProductDashboard() {
   const { show: showToast } = useToast();
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'ATTN' | 'OUT'>('ALL');
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (id: string) => setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // Componente interno: menu de ações com portal e posicionamento fixo para evitar clipping/rolagem
+  function ActionMenu({
+    trigger,
+    items,
+  }: {
+    trigger: (args: { onClick: (e: React.MouseEvent) => void }) => React.ReactNode;
+    items: React.ReactNode;
+  }) {
+    const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ top?: number; bottom?: number; left?: number } | null>(null);
+
+    const handleOpen = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const preferredTop = rect.bottom + 8;
+      const preferredLeft = rect.right - 192; // ~ w-48
+      const estimatedHeight = 220; // altura estimada do menu
+      const willOverflowBottom = preferredTop + estimatedHeight > window.innerHeight;
+      const top = willOverflowBottom ? undefined : preferredTop;
+      const bottom = willOverflowBottom ? window.innerHeight - rect.top + 8 : undefined;
+      const left = Math.max(8, preferredLeft);
+      setPos({ top, bottom, left });
+      setOpen(true);
+    };
+
+    useEffect(() => {
+      if (!open) return;
+      const close = () => setOpen(false);
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') setOpen(false);
+      };
+      window.addEventListener('mousedown', close);
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, true);
+      return () => {
+        window.removeEventListener('mousedown', close);
+        window.removeEventListener('keydown', onKey);
+        window.removeEventListener('resize', close);
+        window.removeEventListener('scroll', close, true);
+      };
+    }, [open]);
+
+    return (
+      <>
+        {trigger({ onClick: handleOpen })}
+        {open && pos &&
+          createPortal(
+            <div
+              className="z-[1000] w-48 rounded-md border bg-white p-1 text-sm shadow-lg"
+              style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {items}
+            </div>,
+            document.body
+          )}
+      </>
+    );
+  }
 
   const query = useQuery<Paged<ProductWithBalance>>({
     queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
@@ -408,9 +472,22 @@ export function ProductDashboard() {
               const isAttn = p.balance > 0 && p.balance < p.minStock;
               const isOk = p.balance >= p.minStock;
               return (
-                <tr key={p.id} className="hover:bg-gray-50 focus-within:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900">{p.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{p.sku}</td>
+                <>
+                <tr className="hover:bg-gray-50 focus-within:bg-gray-50" key={`${p.id}-main`}>
+                  <td
+                    className="px-4 py-3 text-sm text-gray-900 cursor-pointer"
+                    onClick={() => toggleExpanded(p.id)}
+                    title="Ver descrição"
+                  >
+                    {p.name}
+                  </td>
+                  <td
+                    className="px-4 py-3 text-sm text-gray-700 cursor-pointer"
+                    onClick={() => toggleExpanded(p.id)}
+                    title="Ver descrição"
+                  >
+                    {p.sku}
+                  </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{p.balance}</td>
                   <td className="px-4 py-3">
                     {isOk && (
@@ -428,7 +505,8 @@ export function ProductDashboard() {
                       <button
                         type="button"
                         className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedProductId(p.id);
                           setOpenMove(true);
                         }}
@@ -437,15 +515,22 @@ export function ProductDashboard() {
                         Movimentar
                       </button>
 
-                      <div className="relative">
-                        <details className="relative inline-block">
-                          <summary
+                      <ActionMenu
+                        trigger={({ onClick }) => (
+                          <button
+                            type="button"
                             aria-label="Mais ações"
-                            className="inline-flex cursor-pointer items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50 select-none list-none"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClick(e);
+                            }}
+                            className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
                           >
                             <MoreHorizontal className="h-4 w-4" />
-                          </summary>
-                          <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
+                          </button>
+                        )}
+                        items={
+                          <>
                             <button
                               type="button"
                               className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
@@ -502,12 +587,23 @@ export function ProductDashboard() {
                             >
                               Excluir
                             </button>
-                          </div>
-                        </details>
-                      </div>
+                          </>
+                        }
+                      />
                     </div>
                   </td>
                 </tr>
+                {expandedIds[p.id] && (
+                  <tr className="bg-gray-50/60" key={`${p.id}-desc`}>
+                    <td colSpan={5} className="px-4 pb-4 pt-0">
+                      <div className="mt-2 rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                        <div className="mb-1 font-medium text-gray-800">Descrição</div>
+                        <p className="whitespace-pre-line">{p.description || 'Sem descrição.'}</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </>
               );
             })}
           </tbody>
@@ -563,72 +659,81 @@ export function ProductDashboard() {
                 >
                   Movimentar
                 </button>
-                <details className="relative">
-                  <summary
-                    aria-label="Mais ações"
-                    className="inline-flex cursor-pointer items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50 select-none list-none"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </summary>
-                  <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
+                <ActionMenu
+                  trigger={({ onClick }) => (
                     <button
                       type="button"
-                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-                      onClick={() => {
-                        setEditInitial(p);
-                        setOpenEdit(true);
+                      aria-label="Mais ações"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClick(e);
                       }}
+                      className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
                     >
-                      Editar
+                      <MoreHorizontal className="h-4 w-4" />
                     </button>
-                    <button
-                      type="button"
-                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
-                      onClick={() => {
-                        setSelectedProductId(p.id);
-                        setOpenHistory(true);
-                      }}
-                    >
-                      Ver Histórico
-                    </button>
-                    <button
-                      type="button"
-                      className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
-                      disabled={p.balance <= 0}
-                      onClick={async () => {
-                        if (p.balance <= 0) return;
-                        const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
-                        if (!ok) return;
-                        try {
-                          await createMovement(p.id, { type: 'OUT', quantity: p.balance });
-                          qc.invalidateQueries({ queryKey: ['products'] });
-                          showToast({ type: 'success', message: `Saldo de ${p.name} zerado com sucesso.` });
-                        } catch (e: any) {
-                          showToast({ type: 'error', message: e?.message || 'Falha ao zerar saldo' });
-                        }
-                      }}
-                    >
-                      Zerar Estoque
-                    </button>
-                    <button
-                      type="button"
-                      className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
-                      onClick={async () => {
-                        const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
-                        if (!ok) return;
-                        try {
-                          await deleteProduct(p.id);
-                          qc.invalidateQueries({ queryKey: ['products'] });
-                          showToast({ type: 'success', message: `Produto ${p.name} excluído.` });
-                        } catch (e: any) {
-                          showToast({ type: 'error', message: e?.message || 'Falha ao excluir produto' });
-                        }
-                      }}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </details>
+                  )}
+                  items={
+                    <>
+                      <button
+                        type="button"
+                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                        onClick={() => {
+                          setEditInitial(p);
+                          setOpenEdit(true);
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedProductId(p.id);
+                          setOpenHistory(true);
+                        }}
+                      >
+                        Ver Histórico
+                      </button>
+                      <button
+                        type="button"
+                        className="block w-full rounded px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                        disabled={p.balance <= 0}
+                        onClick={async () => {
+                          if (p.balance <= 0) return;
+                          const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
+                          if (!ok) return;
+                          try {
+                            await createMovement(p.id, { type: 'OUT', quantity: p.balance });
+                            qc.invalidateQueries({ queryKey: ['products'] });
+                            showToast({ type: 'success', message: `Saldo de ${p.name} zerado com sucesso.` });
+                          } catch (e: any) {
+                            showToast({ type: 'error', message: e?.message || 'Falha ao zerar saldo' });
+                          }
+                        }}
+                      >
+                        Zerar Estoque
+                      </button>
+                      <button
+                        type="button"
+                        className="block w-full rounded px-2 py-2 text-left text-red-700 hover:bg-red-50"
+                        onClick={async () => {
+                          const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
+                          if (!ok) return;
+                          try {
+                            await deleteProduct(p.id);
+                            qc.invalidateQueries({ queryKey: ['products'] });
+                            showToast({ type: 'success', message: `Produto ${p.name} excluído.` });
+                          } catch (e: any) {
+                            showToast({ type: 'error', message: e?.message || 'Falha ao excluir produto' });
+                          }
+                        }}
+                      >
+                        Excluir
+                      </button>
+                    </>
+                  }
+                />
               </div>
             </div>
           );
