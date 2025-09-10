@@ -138,6 +138,62 @@ export function ProductDashboard() {
               </option>
             ))}
           </select>
+
+          {/* Ações em massa na página atual */}
+          <span className="ml-2 h-5 w-px bg-gray-300" aria-hidden="true" />
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+            disabled={items.length === 0 || query.isFetching}
+            onClick={async () => {
+              if (items.length === 0) return;
+              const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
+              if (totalBalance <= 0) {
+                alert('Nenhum item com saldo > 0 nesta página.');
+                return;
+              }
+              const ok = window.confirm(
+                `Zerar todos os produtos desta página? Será lançada SAÍDA (OUT) total de ${totalBalance}.`
+              );
+              if (!ok) return;
+              const ops = items
+                .filter((it) => it.balance > 0)
+                .map((it) => createMovement(it.id, { type: 'OUT', quantity: it.balance }));
+              const results = await Promise.allSettled(ops);
+              const failed = results.filter((r) => r.status === 'rejected');
+              if (failed.length > 0) {
+                alert(`Falha ao zerar ${failed.length} de ${results.length} produtos.`);
+              }
+              qc.invalidateQueries({ queryKey: ['products'] });
+            }}
+            title="Zerar todos os saldos da página"
+          >
+            Zerar página
+          </button>
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1 text-sm hover:bg-red-50 text-red-700 border-red-300 disabled:opacity-50"
+            disabled={items.length === 0 || query.isFetching}
+            onClick={async () => {
+              if (items.length === 0) return;
+              const ok = window.confirm(
+                `Excluir todos os produtos desta página? Esta ação remove os produtos e suas movimentações.`
+              );
+              if (!ok) return;
+              const ops = items.map((it) => deleteProduct(it.id));
+              const results = await Promise.allSettled(ops);
+              const failed = results.filter((r) => r.status === 'rejected');
+              if (failed.length > 0) {
+                alert(`Falha ao excluir ${failed.length} de ${results.length} produtos.`);
+              }
+              // Voltar para página 1 se a página ficar vazia
+              setPage(1);
+              qc.invalidateQueries({ queryKey: ['products'] });
+            }}
+            title="Excluir todos os produtos da página"
+          >
+            Excluir página
+          </button>
         </div>
       </div>
 
