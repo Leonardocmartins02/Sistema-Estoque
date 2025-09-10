@@ -1,8 +1,17 @@
 import type { Product, ProductWithBalance } from './types';
 
-export async function fetchProducts(search: string): Promise<ProductWithBalance[]> {
+export async function fetchProducts(
+  search: string,
+  page = 1,
+  pageSize = 10,
+): Promise<{ items: ProductWithBalance[]; total: number; page: number; pageSize: number }> {
   const term = search.trim();
-  const url = term ? `/api/products?search=${encodeURIComponent(term)}` : '/api/products';
+  const params = new URLSearchParams();
+  if (term) params.set('search', term);
+  params.set('page', String(page));
+  params.set('pageSize', String(pageSize));
+  const qs = params.toString();
+  const url = `/api/products?${qs}`;
 
   try {
     // Add timeout to avoid hanging requests
