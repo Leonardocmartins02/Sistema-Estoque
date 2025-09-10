@@ -268,8 +268,8 @@ export function ProductDashboard() {
         </div>
       </div>
 
-      {/* Tabela (desktop/tablet) */}
-      <div className="mt-4 overflow-x-auto hidden md:block">
+      {/* Tabela (desktop grande) */}
+      <div className="mt-4 overflow-x-auto hidden lg:block">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -386,15 +386,12 @@ export function ProductDashboard() {
                       </button>
 
                       <div className="relative">
-                        <details className="group inline-block">
-                          <summary className="list-none">
-                            <button
-                              type="button"
-                              aria-label="Mais ações"
-                              className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
+                        <details className="relative inline-block">
+                          <summary
+                            aria-label="Mais ações"
+                            className="inline-flex cursor-pointer items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50 select-none list-none"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
                           </summary>
                           <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
                             <button
@@ -465,8 +462,8 @@ export function ProductDashboard() {
         </table>
       </div>
 
-      {/* Cards (mobile) */}
-      <div className="mt-4 space-y-3 md:hidden">
+      {/* Cards (mobile e tablets) */}
+      <div className="mt-4 space-y-3 lg:hidden">
         {query.isLoading && (
           <div className="rounded-lg border bg-white p-4 text-sm text-gray-500">Carregando...</div>
         )}
@@ -515,14 +512,11 @@ export function ProductDashboard() {
                   Movimentar
                 </button>
                 <details className="relative">
-                  <summary className="list-none">
-                    <button
-                      type="button"
-                      aria-label="Mais ações"
-                      className="inline-flex items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                  <summary
+                    aria-label="Mais ações"
+                    className="inline-flex cursor-pointer items-center rounded-md border bg-white p-1.5 text-gray-600 hover:bg-gray-50 select-none list-none"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
                   </summary>
                   <div className="absolute right-0 z-30 mt-2 w-48 rounded-md border bg-white p-1 text-sm shadow-lg">
                     <button
