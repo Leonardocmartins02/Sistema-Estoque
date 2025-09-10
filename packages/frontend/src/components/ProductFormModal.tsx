@@ -9,10 +9,17 @@ const schema = z.object({
   name: z.string().min(1, 'Informe o nome'),
   sku: z.string().min(1, 'Informe o SKU'),
   minStock: z.coerce.number().int().min(0, 'Estoque mínimo deve ser >= 0'),
+  initialStock: z.coerce
+    .number()
+    .int()
+    .min(0, 'Estoque inicial deve ser >= 0')
+    .default(0),
   description: z.string().optional().or(z.literal('')),
 });
 
-export type ProductFormValues = z.infer<typeof schema>;
+// Types aligned with ZodResolver: input (raw) vs output (after coercion/defaults)
+export type ProductFormInput = z.input<typeof schema>;
+export type ProductFormValues = z.output<typeof schema>;
 
 type Props = {
   open: boolean;
@@ -31,41 +38,18 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<ProductFormValues>({
+  } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       name: initialValues?.name ?? '',
       sku: initialValues?.sku ?? '',
       minStock: initialValues?.minStock ?? 0,
+      initialStock: 0,
       description: initialValues?.description ?? '',
     },
   });
 
-  async function onSubmit(values: ProductFormValues) {
-    setServerError(null);
-    try {
-      if (mode === 'create') {
-        await createProduct({
-          name: values.name,
-          sku: values.sku,
-          minStock: values.minStock,
-          description: values.description || undefined,
-        });
-      } else if (mode === 'edit' && initialId) {
-        await updateProduct(initialId, {
-          name: values.name,
-          sku: values.sku,
-          minStock: values.minStock,
-          description: values.description || undefined,
-        });
-      }
-      reset();
-      onOpenChange(false);
-      onSuccess?.();
-    } catch (e: any) {
-      setServerError(e?.message || 'Falha ao salvar produto');
-    }
-  }
+  // Submit logic is inlined into handleSubmit below to simplify generic typing
 
   const title = mode === 'create' ? 'Novo Produto' : 'Editar Produto';
 
@@ -82,7 +66,35 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
             Preencha os campos abaixo. Todos os campos com * são obrigatórios.
           </Dialog.Description>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <form
+            onSubmit={handleSubmit(async (values) => {
+              setServerError(null);
+              try {
+                if (mode === 'create') {
+                  await createProduct({
+                    name: values.name,
+                    sku: values.sku,
+                    minStock: values.minStock,
+                    initialStock: values.initialStock ?? 0,
+                    description: values.description || undefined,
+                  });
+                } else if (mode === 'edit' && initialId) {
+                  await updateProduct(initialId, {
+                    name: values.name,
+                    sku: values.sku,
+                    minStock: values.minStock,
+                    description: values.description || undefined,
+                  });
+                }
+                reset();
+                onOpenChange(false);
+                onSuccess?.();
+              } catch (e: any) {
+                setServerError(e?.message || 'Falha ao salvar produto');
+              }
+            })}
+            className="space-y-3"
+          >
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                 Nome*
@@ -132,6 +144,27 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
                 </p>
               )}
             </div>
+
+            {mode === 'create' && (
+              <div>
+                <label htmlFor="initialStock" className="block text-sm font-medium text-gray-700">
+                  Estoque inicial (opcional)
+                </label>
+                <input
+                  id="initialStock"
+                  type="number"
+                  min={0}
+                  placeholder="Ex.: 10"
+                  className="mt-1 w-full rounded-md border border-gray-300 p-2 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
+                  {...register('initialStock')}
+                />
+                {errors.initialStock && (
+                  <p className="mt-1 text-xs text-red-700" role="alert">
+                    {errors.initialStock.message}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700">

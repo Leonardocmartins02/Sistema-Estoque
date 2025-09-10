@@ -48,6 +48,7 @@ export async function createProduct(data: {
   sku: string;
   description?: string | null;
   minStock: number;
+  initialStock?: number;
 }): Promise<Product> {
   const res = await fetch('/api/products', {
     method: 'POST',
