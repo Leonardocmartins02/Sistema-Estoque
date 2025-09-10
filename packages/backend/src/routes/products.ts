@@ -79,6 +79,7 @@ const productSchema = z.object({
   sku: z.string().min(1),
   description: z.string().optional().nullable(),
   minStock: z.number().int().min(0).default(0),
+  initialStock: z.number().int().min(0).optional().default(0),
 });
 
 router.post('/', async (req, res, next) => {
@@ -89,7 +90,19 @@ router.post('/', async (req, res, next) => {
     const existing = await prisma.product.findUnique({ where: { sku: data.sku } });
     if (existing) return res.status(409).json({ message: 'SKU já cadastrado.' });
 
-    const created = await prisma.product.create({ data: { ...data } });
+    const { initialStock, ...productData } = data;
+    const created = await prisma.product.create({ data: { ...productData } });
+
+    if ((initialStock ?? 0) > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          productId: created.id,
+          type: 'IN',
+          quantity: initialStock!,
+          date: new Date(),
+        },
+      });
+    }
     res.status(201).json(created);
   } catch (err) {
     next(err);
