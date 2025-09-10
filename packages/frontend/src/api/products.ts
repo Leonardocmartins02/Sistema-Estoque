@@ -1,14 +1,33 @@
 import type { Product, ProductWithBalance } from './types';
 
 export async function fetchProducts(search: string): Promise<ProductWithBalance[]> {
-  const params = new URLSearchParams();
-  if (search.trim()) params.set('search', search.trim());
+  const term = search.trim();
+  const url = term ? `/api/products?search=${encodeURIComponent(term)}` : '/api/products';
 
-  const res = await fetch(`/api/products?${params.toString()}`);
-  if (!res.ok) {
-    throw new Error('Falha ao carregar produtos');
+  try {
+    // Add timeout to avoid hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const body = await res.json();
+        detail = body?.message ? `: ${body.message}` : '';
+      } catch {
+        // ignore body parse errors
+      }
+      throw new Error(`Falha ao carregar produtos (HTTP ${res.status})${detail}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    // Rede ou outras falhas
+    if (err?.name === 'AbortError') {
+      throw new Error('Tempo de resposta da API excedido. Tente novamente.');
+    }
+    throw new Error(err?.message || 'Falha ao carregar produtos');
   }
-  return res.json();
 }
 
 export async function createProduct(data: {
