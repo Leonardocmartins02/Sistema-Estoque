@@ -10,12 +10,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './ui/ToastProvider';
 import { createMovement } from '../api/movements';
 import { deleteProduct, createProduct } from '../api/products';
-import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow, Filter, Plus } from 'lucide-react';
 import { DataTable, type Column, type Sort } from './ui/DataTable';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import { Select } from './ui/Select';
 import Card from './ui/Card';
+import Badge from './ui/Badge';
 import { createPortal } from 'react-dom';
 
 export function ProductDashboard() {
@@ -136,7 +137,8 @@ export function ProductDashboard() {
           <p className="text-sm text-gray-500">Gerencie o cadastro e o estoque</p>
           <div className="mt-6">
             <Button variant="primary" size="md" onClick={() => setOpenCreate(true)}>
-              + Adicionar Produto
+              <Plus className="h-4 w-4" />
+              Adicionar Produto
             </Button>
           </div>
 
@@ -168,9 +170,9 @@ export function ProductDashboard() {
           <details className="group inline-block">
             <summary
               aria-label="Abrir filtros"
-              className="inline-flex cursor-pointer items-center gap-1 rounded-full border bg-white px-3.5 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border bg-white px-3.5 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
             >
-              Filtros <ChevronDown className="h-4 w-4" />
+              <Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-4 w-4" />
             </summary>
             <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border bg-white p-3 text-sm shadow-xl">
               <div className="mb-3">
@@ -305,7 +307,10 @@ export function ProductDashboard() {
               header: 'SKU',
               sortable: true,
               render: (p) => (
-                <span className="cursor-pointer text-sm text-gray-700" onClick={() => toggleExpanded((p as ProductWithBalance).id)}>
+                <span
+                  className="cursor-pointer text-sm font-medium tracking-wide text-gray-500 hover:text-gray-700 uppercase"
+                  onClick={() => toggleExpanded((p as ProductWithBalance).id)}
+                >
                   {(p as ProductWithBalance).sku}
                 </span>
               ),
@@ -315,7 +320,15 @@ export function ProductDashboard() {
               header: 'Saldo Atual',
               sortable: true,
               align: 'right',
-              render: (p) => <span className="font-medium text-gray-900">{(p as ProductWithBalance).balance}</span>,
+              render: (p) => {
+                const it = p as ProductWithBalance;
+                const isOut = it.balance === 0;
+                const isAttn = it.balance > 0 && it.balance < it.minStock;
+                const cls = isOut ? 'text-rose-600' : isAttn ? 'text-amber-600' : 'text-gray-900';
+                return (
+                  <span className={`font-semibold ${cls}`}>{it.balance} <span className="font-normal text-gray-500">un.</span></span>
+                );
+              },
             },
             {
               key: 'status',
@@ -327,15 +340,9 @@ export function ProductDashboard() {
                 const isOk = it.balance >= it.minStock;
                 return (
                   <span>
-                    {isOk && (
-                      <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">OK</span>
-                    )}
-                    {isAttn && (
-                      <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Atenção</span>
-                    )}
-                    {isOut && (
-                      <span className="inline-flex items-center rounded-md bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800">Em Falta</span>
-                    )}
+                    {isOk && <Badge variant="success">Em Estoque</Badge>}
+                    {isAttn && <Badge variant="warning">Estoque Baixo</Badge>}
+                    {isOut && <Badge variant="danger">Fora de Estoque</Badge>}
                   </span>
                 );
               },
@@ -460,7 +467,7 @@ export function ProductDashboard() {
               error={query.isError ? (query.error as Error)?.message || 'Erro ao carregar produtos' : null}
               empty={<span>Nenhum produto encontrado.</span>}
               footer={
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="flex items-center gap-2">
                     <Select
                       aria-label="Itens por página"
@@ -481,25 +488,81 @@ export function ProductDashboard() {
                       disabled={items.length === 0 || query.isFetching}
                       onClick={async () => {
                         if (items.length === 0) return;
-                        const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
-                        if (totalBalance <= 0) {
-                          showToast({ type: 'info', message: 'Nenhum item com saldo > 0 nesta página.' });
+                        
+                        // Filtra apenas itens com saldo > 0
+                        const itemsWithBalance = items.filter(it => it.balance > 0);
+                        if (itemsWithBalance.length === 0) {
+                          showToast({ 
+                            type: 'info', 
+                            message: 'Nenhum item com saldo > 0 nesta página.' 
+                          });
                           return;
                         }
+                        
+                        // Calcula o total a ser zerado
+                        const totalBalance = itemsWithBalance.reduce((acc, it) => acc + it.balance, 0);
+                        
+                        // Confirmação do usuário
                         const ok = window.confirm(
-                          `Zerar todos os produtos desta página? Será lançada SAÍDA (OUT) total de ${totalBalance}.`
+                          `Deseja realmente zerar o saldo de ${itemsWithBalance.length} produtos?\n` +
+                          `Total de saída: ${totalBalance} unidades.`
                         );
+                        
                         if (!ok) return;
-                        const ops = items
-                          .filter((it) => it.balance > 0)
-                          .map((it) => createMovement(it.id, { type: 'OUT', quantity: it.balance }));
-                        const results = await Promise.allSettled(ops);
-                        const failed = results.filter((r) => r.status === 'rejected');
-                        if (failed.length > 0) {
-                          showToast({ type: 'error', message: `Falha ao zerar ${failed.length} de ${results.length} produtos.` });
+                        
+                        try {
+                          // Mostra feedback visual
+                          showToast({ 
+                            type: 'info', 
+                            message: 'Processando...'
+                          });
+                          
+                          // Executa as operações em série para evitar sobrecarga
+                          const results = [];
+                          const failed = [];
+                          
+                          for (const item of itemsWithBalance) {
+                            try {
+                              await createMovement(item.id, { 
+                                type: 'OUT', 
+                                quantity: item.balance,
+                                note: 'Zerando saldo da página'
+                              });
+                              results.push(item.id);
+                            } catch (error) {
+                              console.error(`Erro ao zerar produto ${item.id}:`, error);
+                              failed.push({
+                                id: item.id,
+                                error: error instanceof Error ? error.message : 'Erro desconhecido'
+                              });
+                            }
+                          }
+                          
+                          // Atualiza os dados
+                          await qc.invalidateQueries({ 
+                            queryKey: ['products', debounced, page, pageSize, sortBy, sortDir] 
+                          });
+                          
+                          // Mostra o resultado
+                          if (failed.length > 0) {
+                            showToast({
+                              type: 'error',
+                              message: `Concluído com ${failed.length} erros. ${results.length} produtos zerados.`
+                            });
+                          } else {
+                            showToast({
+                              type: 'success',
+                              message: `${results.length} produtos zerados com sucesso!`
+                            });
+                          }
+                          
+                        } catch (error) {
+                          console.error('Erro inesperado:', error);
+                          showToast({
+                            type: 'error',
+                            message: 'Ocorreu um erro inesperado. Verifique o console para detalhes.'
+                          });
                         }
-                        qc.invalidateQueries({ queryKey: ['products'] });
-                        showToast({ type: 'success', message: 'Saldos da página zerados.' });
                       }}
                       title="Zerar todos os saldos da página"
                     >
@@ -511,19 +574,74 @@ export function ProductDashboard() {
                       disabled={items.length === 0 || query.isFetching}
                       onClick={async () => {
                         if (items.length === 0) return;
-                        const ok = window.confirm(
-                          `Excluir todos os produtos desta página? Esta ação remove os produtos e suas movimentações.`
+                        
+                        // Confirmação reforçada
+                        const confirmed = window.confirm(
+                          `ATENÇÃO: Você está prestes a excluir PERMANENTEMENTE ${items.length} produtos.\n\n` +
+                          `✅ Todos os produtos da página atual\n` +
+                          `✅ Todo o histórico de movimentações\n\n` +
+                          `Esta operação NÃO PODE SER DESFEITA!\n\n` +
+                          `Digite "EXCLUIR" para confirmar:`
                         );
-                        if (!ok) return;
-                        const ops = items.map((it) => deleteProduct(it.id));
-                        const results = await Promise.allSettled(ops);
-                        const failed = results.filter((r) => r.status === 'rejected');
-                        if (failed.length > 0) {
-                          showToast({ type: 'error', message: `Falha ao excluir ${failed.length} de ${results.length} produtos.` });
+                        
+                        if (!confirmed) return;
+                        
+                        const userInput = window.prompt('Digite "EXCLUIR" para confirmar a exclusão:');
+                        if (userInput?.toUpperCase() !== 'EXCLUIR') {
+                          showToast({ type: 'info', message: 'Exclusão cancelada pelo usuário.' });
+                          return;
                         }
-                        setPage(1);
-                        qc.invalidateQueries({ queryKey: ['products'] });
-                        showToast({ type: 'success', message: 'Produtos da página excluídos.' });
+                        
+                        try {
+                          // Mostra feedback visual
+                          showToast({ 
+                            type: 'info', 
+                            message: 'Excluindo produtos...'
+                          });
+                          
+                          // Executa as exclusões em série para evitar sobrecarga
+                          const results = [];
+                          const failed = [];
+                          
+                          for (const item of items) {
+                            try {
+                              await deleteProduct(item.id);
+                              results.push(item.id);
+                            } catch (error) {
+                              console.error(`Erro ao excluir produto ${item.id}:`, error);
+                              failed.push({
+                                id: item.id,
+                                error: error instanceof Error ? error.message : 'Erro desconhecido'
+                              });
+                            }
+                          }
+                          
+                          // Atualiza os dados e volta para a primeira página
+                          setPage(1);
+                          await qc.invalidateQueries({ 
+                            queryKey: ['products', debounced, 1, pageSize, sortBy, sortDir] 
+                          });
+                          
+                          // Mostra o resultado
+                          if (failed.length > 0) {
+                            showToast({
+                              type: 'error',
+                              message: `Concluído com ${failed.length} erros. ${results.length} produtos excluídos.`
+                            });
+                          } else {
+                            showToast({
+                              type: 'success',
+                              message: `${results.length} produtos excluídos com sucesso!`
+                            });
+                          }
+                          
+                        } catch (error) {
+                          console.error('Erro inesperado:', error);
+                          showToast({
+                            type: 'error',
+                            message: 'Ocorreu um erro inesperado. Verifique o console para detalhes.'
+                          });
+                        }
                       }}
                       title="Excluir todos os produtos da página"
                     >
@@ -538,15 +656,7 @@ export function ProductDashboard() {
       </div>
 
       {/* Barra de paginação e ações em massa (abaixo da tabela) */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-gray-600">
-          Total: <span className="font-medium">{total}</span>{' '}
-          {total > 0 && (
-            <span>
-              (Página {currentPage} de {totalPages})
-            </span>
-          )}
-        </div>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -556,6 +666,9 @@ export function ProductDashboard() {
           >
             ← Anterior
           </button>
+          <span className="text-sm text-gray-600 px-2">
+            Página {currentPage} de {totalPages}
+          </span>
           <button
             type="button"
             className="rounded-full border px-3.5 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
@@ -564,7 +677,6 @@ export function ProductDashboard() {
           >
             Próxima →
           </button>
-          
         </div>
       </div>
 
@@ -645,7 +757,7 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"
+                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"                                                                                                                    
                         onClick={() => {
                           setSelectedProductId(p.id);
                           setOpenHistory(true);

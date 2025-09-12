@@ -20,14 +20,25 @@ export async function createMovement(
   productId: string,
   data: { type: 'IN' | 'OUT'; quantity: number; date?: string; note?: string },
 ): Promise<Movement> {
-  const res = await fetch(`/api/products/${productId}/movements`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.message || 'Falha ao registrar movimentação');
+  console.log('Enviando requisição para criar movimentação:', { productId, data });
+  try {
+    const res = await fetch(`/api/products/${productId}/movements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    
+    console.log('Resposta da API (status):', res.status);
+    const responseData = await res.json().catch(() => ({}));
+    console.log('Resposta da API (dados):', responseData);
+    
+    if (!res.ok) {
+      throw new Error(responseData?.message || 'Falha ao registrar movimentação');
+    }
+    
+    return responseData;
+  } catch (error) {
+    console.error('Erro na requisição createMovement:', error);
+    throw error;
   }
-  return res.json();
 }

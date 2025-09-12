@@ -54,15 +54,27 @@ router.get('/:id/movements', async (req, res) => {
 });
 
 router.post('/:id/movements', async (req, res, next) => {
+  console.log('Recebida requisição POST para /api/products/:id/movements', {
+    params: req.params,
+    body: req.body,
+    headers: req.headers
+  });
+  
   try {
     const id = req.params.id;
+    console.log('Validando dados da requisição...');
     const data = movementSchema.parse(req.body);
+    console.log('Dados validados:', data);
 
-    // Validate product exists
+    console.log('Buscando produto com ID:', id);
     const product = await prisma.product.findUnique({ where: { id } });
-    if (!product) return res.status(404).json({ message: 'Produto não encontrado' });
+    if (!product) {
+      console.log('Produto não encontrado com ID:', id);
+      return res.status(404).json({ message: 'Produto não encontrado' });
+    }
+    console.log('Produto encontrado:', product);
 
-    // Compute current balance
+    console.log('Calculando saldo atual...');
     const agg = await prisma.stockMovement.groupBy({
       by: ['type'],
       where: { productId: id },
@@ -71,11 +83,19 @@ router.post('/:id/movements', async (req, res, next) => {
     const sumIn = agg.find((a) => a.type === 'IN')?._sum.quantity || 0;
     const sumOut = agg.find((a) => a.type === 'OUT')?._sum.quantity || 0;
     const balance = sumIn - sumOut;
+    console.log('Saldo atual:', { sumIn, sumOut, balance });
 
     if (data.type === 'OUT' && data.quantity > balance) {
-      return res.status(422).json({ message: 'Saída maior que o saldo atual do produto.' });
+      console.log('Erro: Saída maior que o saldo atual', { 
+        quantidade: data.quantity, 
+        saldo: balance 
+      });
+      return res.status(422).json({ 
+        message: 'Saída maior que o saldo atual do produto.' 
+      });
     }
 
+    console.log('Criando movimentação...');
     const created = await prisma.stockMovement.create({
       data: {
         productId: id,
@@ -85,9 +105,11 @@ router.post('/:id/movements', async (req, res, next) => {
         note: data.note ?? undefined,
       },
     });
+    console.log('Movimentação criada com sucesso:', created);
 
     res.status(201).json(created);
   } catch (err) {
+    console.error('Erro ao processar requisição:', err);
     next(err);
   }
 });

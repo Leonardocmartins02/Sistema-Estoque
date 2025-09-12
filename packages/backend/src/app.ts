@@ -5,7 +5,13 @@ import routes from './routes';
 export function createServer() {
   const app = express();
 
-  app.use(cors());
+  // Configuração do CORS para permitir a origem do frontend
+  app.use(cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+  }));
   app.use(express.json());
 
   app.get('/health', (_req, res) => res.json({ ok: true }));

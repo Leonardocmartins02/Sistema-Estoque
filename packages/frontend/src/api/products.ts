@@ -79,9 +79,22 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.message || 'Falha ao excluir produto');
+  console.log('Enviando requisição para excluir produto:', { id });
+  try {
+    const res = await fetch(`/api/products/${id}`, { 
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    console.log('Resposta da API (status):', res.status);
+    const responseData = await res.json().catch(() => ({}));
+    console.log('Resposta da API (dados):', responseData);
+    
+    if (!res.ok) {
+      throw new Error(responseData?.message || 'Falha ao excluir produto');
+    }
+  } catch (error) {
+    console.error('Erro na requisição deleteProduct:', error);
+    throw error;
   }
 }

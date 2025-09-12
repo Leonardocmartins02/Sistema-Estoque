@@ -144,14 +144,50 @@ router.put('/:id', async (req, res, next) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const id = req.params.id;
-  const product = await prisma.product.findUnique({ where: { id } });
-  if (!product) return res.status(404).json({ message: 'Produto não encontrado' });
+  console.log('Recebida requisição DELETE para /api/products/:id', {
+    params: req.params,
+    headers: req.headers
+  });
+  
+  try {
+    const id = req.params.id;
+    console.log('Buscando produto com ID:', id);
+    
+    const product = await prisma.product.findUnique({ 
+      where: { id },
+      include: { _count: { select: { movements: true } } }
+    });
+    
+    if (!product) {
+      console.log('Produto não encontrado com ID:', id);
+      return res.status(404).json({ message: 'Produto não encontrado' });
+    }
+    
+    console.log('Produto encontrado:', {
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      totalMovements: product._count.movements
+    });
 
-  // Remover movimentações primeiro para evitar violação de FK
-  await prisma.stockMovement.deleteMany({ where: { productId: id } });
-  await prisma.product.delete({ where: { id } });
-  res.status(204).send();
+    console.log('Removendo movimentações do produto...');
+    const deleteResult = await prisma.stockMovement.deleteMany({ 
+      where: { productId: id } 
+    });
+    console.log(`Movimentações removidas: ${deleteResult.count}`);
+    
+    console.log('Removendo produto...');
+    await prisma.product.delete({ where: { id } });
+    console.log('Produto removido com sucesso');
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Erro ao excluir produto:', error);
+    res.status(500).json({ 
+      message: 'Erro interno ao processar a exclusão',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 });
 
 export default router;

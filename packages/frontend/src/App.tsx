@@ -1,5 +1,6 @@
 import ProductDashboard from './components/ProductDashboard';
 import { ToastProvider } from './components/ui/ToastProvider';
+import ApiStatusBanner from './components/ui/ApiStatusBanner';
 
 function App() {
   return (
@@ -13,6 +14,8 @@ function App() {
             </div>
           </div>
         </header>
+
+        <ApiStatusBanner />
 
         <section className="mx-auto max-w-5xl p-4">
           <ProductDashboard />
