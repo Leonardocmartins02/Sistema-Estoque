@@ -1,5 +1,7 @@
 import type { Product, ProductWithBalance } from './types';
 
+const API_PREFIX = '/api';
+
 export async function fetchProducts(
   search: string,
   page = 1,
@@ -15,7 +17,7 @@ export async function fetchProducts(
   params.set('sortBy', sortBy);
   params.set('sortDir', sortDir);
   const qs = params.toString();
-  const url = `/api/products?${qs}`;
+  const url = `${API_PREFIX}/products?${qs}`;
 
   try {
     // Add timeout to avoid hanging requests
@@ -50,7 +52,7 @@ export async function createProduct(data: {
   minStock: number;
   initialStock?: number;
 }): Promise<Product> {
-  const res = await fetch('/api/products', {
+  const res = await fetch(`${API_PREFIX}/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -66,7 +68,7 @@ export async function updateProduct(
   id: string,
   data: Partial<{ name: string; sku: string; description?: string | null; minStock: number }>,
 ): Promise<Product> {
-  const res = await fetch(`/api/products/${id}`, {
+  const res = await fetch(`${API_PREFIX}/products/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -79,22 +81,36 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  console.log('Enviando requisição para excluir produto:', { id });
+  const url = `${API_PREFIX}/products/${id}`;
+  console.log('Deleting product:', url);
+  
   try {
-    const res = await fetch(`/api/products/${id}`, { 
+    const res = await fetch(url, { 
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' }
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json'
+      }
     });
     
-    console.log('Resposta da API (status):', res.status);
-    const responseData = await res.json().catch(() => ({}));
-    console.log('Resposta da API (dados):', responseData);
+    console.log('Delete product response status:', res.status);
     
     if (!res.ok) {
-      throw new Error(responseData?.message || 'Falha ao excluir produto');
+      let errorMessage = 'Falha ao excluir produto';
+      try {
+        const errorData = await res.json();
+        console.error('Error details:', errorData);
+        errorMessage = errorData?.message || errorMessage;
+      } catch (e) {
+        const text = await res.text();
+        console.error('Failed to parse error response:', text);
+      }
+      throw new Error(errorMessage);
     }
+    
+    console.log('Product deleted successfully');
   } catch (error) {
-    console.error('Erro na requisição deleteProduct:', error);
+    console.error('Error in deleteProduct:', error);
     throw error;
   }
 }

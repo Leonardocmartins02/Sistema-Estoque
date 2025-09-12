@@ -54,27 +54,28 @@ router.get('/:id/movements', async (req, res) => {
 });
 
 router.post('/:id/movements', async (req, res, next) => {
-  console.log('Recebida requisição POST para /api/products/:id/movements', {
-    params: req.params,
-    body: req.body,
-    headers: req.headers
-  });
-  
   try {
+    console.log('Received POST request to create movement:', {
+      params: req.params,
+      body: req.body,
+      headers: req.headers
+    });
+    
     const id = req.params.id;
-    console.log('Validando dados da requisição...');
+    console.log('Validating movement data...');
     const data = movementSchema.parse(req.body);
-    console.log('Dados validados:', data);
+    console.log('Validated movement data:', data);
 
-    console.log('Buscando produto com ID:', id);
+    // Validate product exists
+    console.log('Checking if product exists:', id);
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) {
-      console.log('Produto não encontrado com ID:', id);
+      console.error('Product not found:', id);
       return res.status(404).json({ message: 'Produto não encontrado' });
     }
-    console.log('Produto encontrado:', product);
+    console.log('Product found:', product);
 
-    console.log('Calculando saldo atual...');
+    // Compute current balance
     const agg = await prisma.stockMovement.groupBy({
       by: ['type'],
       where: { productId: id },
@@ -83,19 +84,24 @@ router.post('/:id/movements', async (req, res, next) => {
     const sumIn = agg.find((a) => a.type === 'IN')?._sum.quantity || 0;
     const sumOut = agg.find((a) => a.type === 'OUT')?._sum.quantity || 0;
     const balance = sumIn - sumOut;
-    console.log('Saldo atual:', { sumIn, sumOut, balance });
 
     if (data.type === 'OUT' && data.quantity > balance) {
-      console.log('Erro: Saída maior que o saldo atual', { 
-        quantidade: data.quantity, 
-        saldo: balance 
-      });
+      const errorMessage = `Insufficient balance. Requested: ${data.quantity}, Available: ${balance}`;
+      console.error(errorMessage);
       return res.status(422).json({ 
-        message: 'Saída maior que o saldo atual do produto.' 
+        message: 'Saída maior que o saldo atual do produto.',
+        details: errorMessage
       });
     }
 
-    console.log('Criando movimentação...');
+    console.log('Creating movement with data:', {
+      productId: id,
+      type: data.type,
+      quantity: data.quantity,
+      date: data.date ? new Date(data.date) : new Date(),
+      note: data.note ?? undefined,
+    });
+
     const created = await prisma.stockMovement.create({
       data: {
         productId: id,
@@ -105,11 +111,11 @@ router.post('/:id/movements', async (req, res, next) => {
         note: data.note ?? undefined,
       },
     });
-    console.log('Movimentação criada com sucesso:', created);
 
+    console.log('Movement created successfully:', created);
     res.status(201).json(created);
   } catch (err) {
-    console.error('Erro ao processar requisição:', err);
+    console.error('Error in POST /:id/movements:', err);
     next(err);
   }
 });

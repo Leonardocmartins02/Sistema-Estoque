@@ -1,5 +1,7 @@
 import type { Movement, Paged } from './types';
 
+const API_PREFIX = '/api';
+
 export async function fetchMovements(
   productId: string,
   page = 1,
@@ -11,34 +13,67 @@ export async function fetchMovements(
   if (filters?.from) params.set('from', filters.from);
   if (filters?.to) params.set('to', filters.to);
   if (filters?.q) params.set('q', filters.q);
-  const res = await fetch(`/api/products/${productId}/movements?${params.toString()}`);
-  if (!res.ok) throw new Error('Falha ao carregar movimentações');
-  return res.json();
+  
+  const url = `${API_PREFIX}/products/${productId}/movements?${params.toString()}`;
+  console.log('Fetching movements:', url);
+  
+  try {
+    const res = await fetch(url);
+    console.log('Response status:', res.status);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Error response:', errorText);
+      throw new Error('Falha ao carregar movimentações');
+    }
+    
+    const data = await res.json();
+    console.log('Movements data:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in fetchMovements:', error);
+    throw error;
+  }
 }
 
 export async function createMovement(
   productId: string,
   data: { type: 'IN' | 'OUT'; quantity: number; date?: string; note?: string },
 ): Promise<Movement> {
-  console.log('Enviando requisição para criar movimentação:', { productId, data });
+  const url = `${API_PREFIX}/products/${productId}/movements`;
+  console.log('Creating movement:', url, data);
+  
   try {
-    const res = await fetch(`/api/products/${productId}/movements`, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include',
       body: JSON.stringify(data),
     });
     
-    console.log('Resposta da API (status):', res.status);
-    const responseData = await res.json().catch(() => ({}));
-    console.log('Resposta da API (dados):', responseData);
+    console.log('Create movement response status:', res.status);
     
     if (!res.ok) {
-      throw new Error(responseData?.message || 'Falha ao registrar movimentação');
+      let errorMessage = 'Falha ao registrar movimentação';
+      try {
+        const errorData = await res.json();
+        console.error('Error details:', errorData);
+        errorMessage = errorData?.message || errorMessage;
+      } catch (e) {
+        const text = await res.text();
+        console.error('Failed to parse error response:', text);
+      }
+      throw new Error(errorMessage);
     }
     
-    return responseData;
+    const result = await res.json();
+    console.log('Movement created successfully:', result);
+    return result;
   } catch (error) {
-    console.error('Erro na requisição createMovement:', error);
+    console.error('Error in createMovement:', error);
     throw error;
   }
 }

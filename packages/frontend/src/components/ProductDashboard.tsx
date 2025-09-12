@@ -407,15 +407,20 @@ export function ProductDashboard() {
                             type="button"
                             className="block w-full rounded-md px-3 py-2.5 text-left hover:bg-gray-50 disabled:opacity-50"
                             disabled={p.balance <= 0}
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              console.log('Zerar estoque clicado', { id: p.id, name: p.name, balance: p.balance });
                               if (p.balance <= 0) return;
                               const ok = window.confirm(`Zerar saldo de ${p.name}? Será lançada uma SAÍDA (OUT) de ${p.balance}.`);
                               if (!ok) return;
                               try {
+                                console.log('Criando movimento de saída...');
                                 await createMovement(p.id, { type: 'OUT', quantity: p.balance });
-                                qc.invalidateQueries({ queryKey: ['products'] });
+                                console.log('Movimento criado com sucesso');
+                                await qc.invalidateQueries({ queryKey: ['products'] });
                                 showToast({ type: 'success', message: `Saldo de ${p.name} zerado com sucesso.` });
                               } catch (e: any) {
+                                console.error('Erro ao zerar saldo:', e);
                                 showToast({ type: 'error', message: e?.message || 'Falha ao zerar saldo' });
                               }
                             }}
@@ -425,14 +430,19 @@ export function ProductDashboard() {
                           <button
                             type="button"
                             className="block w-full rounded-md px-3 py-2.5 text-left text-red-700 hover:bg-red-50"
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              console.log('Excluir produto clicado', { id: p.id, name: p.name });
                               const ok = window.confirm(`Excluir produto ${p.name}? Esta ação não pode ser desfeita.`);
                               if (!ok) return;
                               try {
+                                console.log('Excluindo produto...');
                                 await deleteProduct(p.id);
-                                qc.invalidateQueries({ queryKey: ['products'] });
+                                console.log('Produto excluído com sucesso');
+                                await qc.invalidateQueries({ queryKey: ['products'] });
                                 showToast({ type: 'success', message: `Produto ${p.name} excluído.` });
                               } catch (e: any) {
+                                console.error('Erro ao excluir produto:', e);
                                 showToast({ type: 'error', message: e?.message || 'Falha ao excluir produto' });
                               }
                             }}
@@ -480,88 +490,82 @@ export function ProductDashboard() {
                       options={[10, 20, 50].map((n) => ({ value: n, label: `${n}/página` }))}
                       className="w-[130px]"
                     />
-                  </div>
-                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       className="rounded-full border px-3.5 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
                       disabled={items.length === 0 || query.isFetching}
-                      onClick={async () => {
-                        if (items.length === 0) return;
+                      onClick={async (e) => {
+                        console.log('=== BOTÃO ZERAR PÁGINA CLICADO ===');
+                        console.log('Items na página:', items);
+                        console.log('Quantidade de itens:', items.length);
+                        console.log('Carregando dados?', query.isFetching);
+                        console.log('Botão desabilitado?', items.length === 0 || query.isFetching);
                         
-                        // Filtra apenas itens com saldo > 0
-                        const itemsWithBalance = items.filter(it => it.balance > 0);
-                        if (itemsWithBalance.length === 0) {
-                          showToast({ 
-                            type: 'info', 
-                            message: 'Nenhum item com saldo > 0 nesta página.' 
-                          });
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (items.length === 0) {
+                          console.log('Nenhum item para zerar');
                           return;
                         }
                         
-                        // Calcula o total a ser zerado
-                        const totalBalance = itemsWithBalance.reduce((acc, it) => acc + it.balance, 0);
+                        const totalBalance = items.reduce((acc, it) => acc + (it.balance > 0 ? it.balance : 0), 0);
+                        console.log('Saldo total a ser zerado:', totalBalance);
                         
-                        // Confirmação do usuário
-                        const ok = window.confirm(
-                          `Deseja realmente zerar o saldo de ${itemsWithBalance.length} produtos?\n` +
-                          `Total de saída: ${totalBalance} unidades.`
-                        );
+                        if (totalBalance <= 0) {
+                          const msg = 'Nenhum item com saldo > 0 nesta página.';
+                          console.log(msg);
+                          showToast({ type: 'info', message: msg });
+                          return;
+                        }
                         
-                        if (!ok) return;
+                        const confirmMsg = `Zerar todos os produtos desta página? Será lançada SAÍDA (OUT) total de ${totalBalance}.`;
+                        console.log('Mensagem de confirmação:', confirmMsg);
+                        const ok = window.confirm(confirmMsg);
+                        
+                        if (!ok) {
+                          console.log('Usuário cancelou a operação');
+                          return;
+                        }
                         
                         try {
-                          // Mostra feedback visual
-                          showToast({ 
-                            type: 'info', 
-                            message: 'Processando...'
+                          console.log('Iniciando processo de zerar saldos...');
+                          const itemsToZero = items.filter((it) => it.balance > 0);
+                          console.log(`${itemsToZero.length} itens para zerar`);
+                          
+                          const ops = itemsToZero.map((it) => {
+                            console.log(`Criando movimento para produto ${it.id} (${it.name}): SAÍDA de ${it.balance}`);
+                            return createMovement(it.id, { type: 'OUT', quantity: it.balance })
+                              .then(() => console.log(`Movimento criado para produto ${it.id}`))
+                              .catch(err => {
+                                console.error(`Erro ao criar movimento para produto ${it.id}:`, err);
+                                throw err;
+                              });
                           });
                           
-                          // Executa as operações em série para evitar sobrecarga
-                          const results = [];
-                          const failed = [];
+                          console.log('Aguardando conclusão de todas as operações...');
+                          const results = await Promise.allSettled(ops);
                           
-                          for (const item of itemsWithBalance) {
-                            try {
-                              await createMovement(item.id, { 
-                                type: 'OUT', 
-                                quantity: item.balance,
-                                note: 'Zerando saldo da página'
-                              });
-                              results.push(item.id);
-                            } catch (error) {
-                              console.error(`Erro ao zerar produto ${item.id}:`, error);
-                              failed.push({
-                                id: item.id,
-                                error: error instanceof Error ? error.message : 'Erro desconhecido'
-                              });
-                            }
-                          }
+                          const failed = results.filter((r) => r.status === 'rejected');
+                          console.log(`Operações concluídas: ${results.length - failed.length} sucesso, ${failed.length} falhas`);
                           
-                          // Atualiza os dados
-                          await qc.invalidateQueries({ 
-                            queryKey: ['products', debounced, page, pageSize, sortBy, sortDir] 
-                          });
-                          
-                          // Mostra o resultado
                           if (failed.length > 0) {
-                            showToast({
-                              type: 'error',
-                              message: `Concluído com ${failed.length} erros. ${results.length} produtos zerados.`
-                            });
-                          } else {
-                            showToast({
-                              type: 'success',
-                              message: `${results.length} produtos zerados com sucesso!`
-                            });
+                            const errorMsg = `Falha ao zerar ${failed.length} de ${results.length} produtos.`;
+                            console.error(errorMsg, { failed });
+                            showToast({ type: 'error', message: errorMsg });
                           }
+                          
+                          console.log('Invalidando cache de produtos...');
+                          await qc.invalidateQueries({ queryKey: ['products'] });
+                          
+                          const successMsg = 'Saldos da página zerados com sucesso!';
+                          console.log(successMsg);
+                          showToast({ type: 'success', message: successMsg });
                           
                         } catch (error) {
-                          console.error('Erro inesperado:', error);
-                          showToast({
-                            type: 'error',
-                            message: 'Ocorreu um erro inesperado. Verifique o console para detalhes.'
-                          });
+                          const errorMsg = 'Erro inesperado ao processar a operação';
+                          console.error(errorMsg, error);
+                          showToast({ type: 'error', message: errorMsg });
                         }
                       }}
                       title="Zerar todos os saldos da página"
@@ -572,75 +576,71 @@ export function ProductDashboard() {
                       type="button"
                       className="rounded-full border px-3.5 py-2 text-sm hover:bg-red-50 text-red-700 border-red-300 disabled:opacity-50"
                       disabled={items.length === 0 || query.isFetching}
-                      onClick={async () => {
-                        if (items.length === 0) return;
+                      onClick={async (e) => {
+                        console.log('=== BOTÃO EXCLUIR PÁGINA CLICADO ===');
+                        console.log('Items na página:', items);
+                        console.log('Quantidade de itens:', items.length);
+                        console.log('Carregando dados?', query.isFetching);
+                        console.log('Botão desabilitado?', items.length === 0 || query.isFetching);
                         
-                        // Confirmação reforçada
-                        const confirmed = window.confirm(
-                          `ATENÇÃO: Você está prestes a excluir PERMANENTEMENTE ${items.length} produtos.\n\n` +
-                          `✅ Todos os produtos da página atual\n` +
-                          `✅ Todo o histórico de movimentações\n\n` +
-                          `Esta operação NÃO PODE SER DESFEITA!\n\n` +
-                          `Digite "EXCLUIR" para confirmar:`
-                        );
+                        e.preventDefault();
+                        e.stopPropagation();
                         
-                        if (!confirmed) return;
+                        if (items.length === 0) {
+                          console.log('Nenhum item para excluir');
+                          return;
+                        }
                         
-                        const userInput = window.prompt('Digite "EXCLUIR" para confirmar a exclusão:');
-                        if (userInput?.toUpperCase() !== 'EXCLUIR') {
-                          showToast({ type: 'info', message: 'Exclusão cancelada pelo usuário.' });
+                        const confirmMsg = `Excluir todos os ${items.length} produtos desta página? Esta ação remove os produtos e suas movimentações.`;
+                        console.log('Mensagem de confirmação:', confirmMsg);
+                        const ok = window.confirm(confirmMsg);
+                        
+                        if (!ok) {
+                          console.log('Usuário cancelou a operação');
                           return;
                         }
                         
                         try {
-                          // Mostra feedback visual
-                          showToast({ 
-                            type: 'info', 
-                            message: 'Excluindo produtos...'
-                          });
+                          console.log('Iniciando processo de exclusão...');
                           
-                          // Executa as exclusões em série para evitar sobrecarga
-                          const results = [];
-                          const failed = [];
-                          
-                          for (const item of items) {
-                            try {
-                              await deleteProduct(item.id);
-                              results.push(item.id);
-                            } catch (error) {
-                              console.error(`Erro ao excluir produto ${item.id}:`, error);
-                              failed.push({
-                                id: item.id,
-                                error: error instanceof Error ? error.message : 'Erro desconhecido'
+                          const ops = items.map((it) => {
+                            console.log(`Excluindo produto ${it.id} (${it.name})...`);
+                            return deleteProduct(it.id)
+                              .then(() => console.log(`Produto ${it.id} excluído com sucesso`))
+                              .catch(err => {
+                                console.error(`Erro ao excluir produto ${it.id}:`, err);
+                                throw err;
                               });
-                            }
-                          }
-                          
-                          // Atualiza os dados e volta para a primeira página
-                          setPage(1);
-                          await qc.invalidateQueries({ 
-                            queryKey: ['products', debounced, 1, pageSize, sortBy, sortDir] 
                           });
                           
-                          // Mostra o resultado
+                          console.log('Aguardando conclusão de todas as exclusões...');
+                          const results = await Promise.allSettled(ops);
+                          
+                          const failed = results.filter((r) => r.status === 'rejected');
+                          console.log(`Exclusões concluídas: ${results.length - failed.length} sucesso, ${failed.length} falhas`);
+                          
                           if (failed.length > 0) {
-                            showToast({
-                              type: 'error',
-                              message: `Concluído com ${failed.length} erros. ${results.length} produtos excluídos.`
-                            });
+                            const errorMsg = `Falha ao excluir ${failed.length} de ${results.length} produtos.`;
+                            console.error(errorMsg, { failed });
+                            showToast({ type: 'error', message: errorMsg });
                           } else {
-                            showToast({
-                              type: 'success',
-                              message: `${results.length} produtos excluídos com sucesso!`
-                            });
+                            console.log('Todos os produtos foram excluídos com sucesso');
                           }
+                          
+                          console.log('Redirecionando para a primeira página...');
+                          setPage(1);
+                          
+                          console.log('Invalidando cache de produtos...');
+                          await qc.invalidateQueries({ queryKey: ['products'] });
+                          
+                          const successMsg = 'Produtos da página excluídos com sucesso!';
+                          console.log(successMsg);
+                          showToast({ type: 'success', message: successMsg });
                           
                         } catch (error) {
-                          console.error('Erro inesperado:', error);
-                          showToast({
-                            type: 'error',
-                            message: 'Ocorreu um erro inesperado. Verifique o console para detalhes.'
-                          });
+                          const errorMsg = 'Erro inesperado ao processar a exclusão';
+                          console.error(errorMsg, error);
+                          showToast({ type: 'error', message: errorMsg });
                         }
                       }}
                       title="Excluir todos os produtos da página"
@@ -662,7 +662,7 @@ export function ProductDashboard() {
             type="button"
             className="rounded-full border px-3.5 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
             disabled={currentPage <= 1 || query.isFetching}
-            onClick={() => setPage((p) => Math.max(p - 1, 1))}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             ← Anterior
           </button>
@@ -673,7 +673,7 @@ export function ProductDashboard() {
             type="button"
             className="rounded-full border px-3.5 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
             disabled={currentPage >= totalPages || query.isFetching}
-            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
             Próxima →
           </button>
@@ -757,7 +757,7 @@ export function ProductDashboard() {
                       </button>
                       <button
                         type="button"
-                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"                                                                                                                    
+                        className="block w-full rounded-md px-2.5 py-2 text-left hover:bg-gray-50"
                         onClick={() => {
                           setSelectedProductId(p.id);
                           setOpenHistory(true);
