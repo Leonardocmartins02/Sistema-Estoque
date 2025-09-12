@@ -1,10 +1,11 @@
-import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createProduct, updateProduct } from '../api/products';
 import { useToast } from './ui/ToastProvider';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
 
 const schema = z.object({
   name: z.string().min(1, 'Informe o nome'),
@@ -56,20 +57,14 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
   const title = mode === 'create' ? 'Novo Produto' : 'Editar Produto';
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 data-[state=open]:animate-fade-in" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow focus:outline-none"
-          aria-describedby={undefined}
-        >
-          <Dialog.Title className="text-lg font-semibold">{title}</Dialog.Title>
-          <Dialog.Description className="mb-4 text-sm text-gray-600">
-            Preencha os campos abaixo. Todos os campos com * são obrigatórios.
-          </Dialog.Description>
-
-          <form
-            onSubmit={handleSubmit(async (values) => {
+    <Modal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title={title}
+      description="Preencha os campos abaixo. Todos os campos com * são obrigatórios."
+    >
+      <form
+        onSubmit={handleSubmit(async (values) => {
               setServerError(null);
               try {
                 if (mode === 'create') {
@@ -98,8 +93,8 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
                 showToast({ type: 'error', message: e?.message || 'Falha ao salvar produto' });
               }
             })}
-            className="space-y-3"
-          >
+        className="space-y-3"
+      >
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                 Nome*
@@ -196,26 +191,13 @@ export function ProductFormModal({ open, onOpenChange, mode, initialId, initialV
             )}
 
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
-                >
-                  Cancelar
-                </button>
-              </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand disabled:opacity-50"
-              >
+              <Button type="button" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
                 {isSubmitting ? 'Salvando...' : 'Salvar'}
-              </button>
+              </Button>
             </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      </form>
+    </Modal>
   );
 }
 

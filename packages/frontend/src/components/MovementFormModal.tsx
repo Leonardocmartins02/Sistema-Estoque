@@ -1,10 +1,11 @@
-import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createMovement } from '../api/movements';
 import { useToast } from './ui/ToastProvider';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
 
 const schema = z.object({
   type: z.enum(['IN', 'OUT'], { required_error: 'Selecione o tipo' }),
@@ -60,19 +61,13 @@ export function MovementFormModal({ open, onOpenChange, productId, onSuccess }: 
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 data-[state=open]:animate-fade-in" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-4 shadow focus:outline-none"
-          aria-describedby={undefined}
-        >
-          <Dialog.Title className="text-lg font-semibold">Movimentar Estoque</Dialog.Title>
-          <Dialog.Description className="mb-4 text-sm text-gray-600">
-            Lance uma entrada (IN) ou saída (OUT) para este produto.
-          </Dialog.Description>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+    <Modal
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title="Movimentar Estoque"
+      description="Lance uma entrada (IN) ou saída (OUT) para este produto."
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             <div>
               <label htmlFor="type" className="block text-sm font-medium text-gray-700">
                 Tipo*
@@ -145,27 +140,14 @@ export function MovementFormModal({ open, onOpenChange, productId, onSuccess }: 
               </p>
             )}
 
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand"
-                >
-                  Cancelar
-                </button>
-              </Dialog.Close>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand disabled:opacity-50"
-              >
-                {isSubmitting ? 'Lançando...' : 'Lançar'}
-              </button>
-            </div>
-          </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button type="button" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
+            {isSubmitting ? 'Lançando...' : 'Lançar'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
