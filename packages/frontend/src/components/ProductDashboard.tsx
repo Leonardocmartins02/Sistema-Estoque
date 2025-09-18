@@ -41,7 +41,10 @@ export function ProductDashboard() {
   useEffect(() => {
     console.log('selectedProduct atualizado:', selectedProduct);
   }, [selectedProduct]);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'ATTN' | 'OUT'>('ALL');
+  type StatusKey = 'OK' | 'ATTN' | 'OUT';
+  const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]); // vazio = Todos
+  const toggleStatus = (val: StatusKey) =>
+    setStatusFilter((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
@@ -126,17 +129,16 @@ export function ProductDashboard() {
   const currentPageSize = query.data?.pageSize ?? pageSize;
   const totalPages = Math.max(Math.ceil(total / currentPageSize), 1);
 
-  // Aplica filtro de status no client-side sobre a página corrente
+  // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
   const filteredItems = useMemo(() => {
-    if (statusFilter === 'ALL') return items;
+    if (!statusFilter.length) return items; // sem seleção = Todos
     return items.filter((p) => {
       const isOut = p.balance === 0;
       const isAttn = p.balance > 0 && p.balance < p.minStock;
       const isOk = p.balance >= p.minStock;
-      if (statusFilter === 'OUT') return isOut;
-      if (statusFilter === 'ATTN') return isAttn;
-      if (statusFilter === 'OK') return isOk;
-      return true;
+      const statuses: Record<StatusKey, boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
+      // item passa se algum status selecionado for verdadeiro
+      return statusFilter.some((k) => statuses[k]);
     });
   }, [items, statusFilter]);
 
@@ -191,8 +193,21 @@ export function ProductDashboard() {
             <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border bg-white p-3 text-sm shadow-2xl">
               <div className="mb-2 font-medium text-gray-900">Status</div>
               <div className="flex flex-wrap gap-2">
+                {/* Todos (limpa seleção) */}
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter([])}
+                  className={`rounded-full px-3 py-1.5 text-xs border transition ${
+                    !statusFilter.length
+                      ? 'border-transparent bg-indigo-600 text-white shadow-sm'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  aria-pressed={!statusFilter.length}
+                >
+                  Todos
+                </button>
+                {/* Seleção múltipla */}
                 {([
-                  ['ALL', 'Todos'],
                   ['OK', 'OK'],
                   ['ATTN', 'Atenção'],
                   ['OUT', 'Em falta'],
@@ -200,13 +215,13 @@ export function ProductDashboard() {
                   <button
                     key={val}
                     type="button"
-                    onClick={() => setStatusFilter(val)}
+                    onClick={() => toggleStatus(val)}
                     className={`rounded-full px-3 py-1.5 text-xs border transition ${
-                      statusFilter === val
+                      statusFilter.includes(val)
                         ? 'border-transparent bg-indigo-600 text-white shadow-sm'
                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                     }`}
-                    aria-pressed={statusFilter === val}
+                    aria-pressed={statusFilter.includes(val)}
                   >
                     {label}
                   </button>
@@ -215,7 +230,7 @@ export function ProductDashboard() {
 
               <div className="mt-3 flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                  Ajuste o status e a lista será atualizada.
+                  Selecione um ou mais status; a lista será atualizada automaticamente.
                 </span>
                 <button
                   type="button"
@@ -223,7 +238,7 @@ export function ProductDashboard() {
                   onClick={() => {
                     setSortBy('name');
                     setSortDir('asc');
-                    setStatusFilter('ALL');
+                    setStatusFilter([]);
                     setPage(1);
                   }}
                   title="Limpar filtros"
