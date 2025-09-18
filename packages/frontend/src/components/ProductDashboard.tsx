@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './ui/ToastProvider';
 import { createMovement } from '../api/movements';
 import { deleteProduct, createProduct } from '../api/products';
-import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow, Filter, Plus, ArrowDownToLine } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow, Filter, Plus, ArrowDownToLine, Check } from 'lucide-react';
 import { DataTable, type Column, type Sort } from './ui/DataTable';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -386,11 +386,10 @@ export function ProductDashboard() {
               header: 'Status',
               width: 'w-[14%]',
               headerRender: (
-                <div className="relative inline-flex items-center gap-1">
-                  <span className="text-[11px] font-semibold tracking-wide text-gray-600 select-none cursor-default">Status</span>
+                <div className="relative inline-flex items-center gap-2">
                   <button
                     type="button"
-                    className="inline-flex items-center rounded px-1 py-0.5 text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                    className="group inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold tracking-wide text-gray-700 shadow-sm hover:bg-white hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
                     onClick={(e) => {
                       e.stopPropagation();
                       setStatusMenuOpen((v) => !v);
@@ -399,35 +398,71 @@ export function ProductDashboard() {
                     aria-expanded={statusMenuOpen}
                     title="Filtrar por Status"
                   >
-                    <ChevronDown className="h-3.5 w-3.5" />
+                    <span className="select-none">Status</span>
+                    {statusFilter.length > 0 && (
+                      <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                        {statusFilter.length}
+                      </span>
+                    )}
+                    <ChevronDown className={`h-3.5 w-3.5 text-gray-500 transition-transform group-hover:text-gray-700 ${statusMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
+
                   {statusMenuOpen && (
-                    <div className="absolute right-0 top-6 z-50 w-48 rounded-md border bg-white p-2 text-xs shadow-lg" onMouseDown={(e)=>e.stopPropagation()}>
-                      <div className="mb-1 text-gray-700">Filtrar status</div>
+                    <div
+                      role="menu"
+                      aria-label="Filtrar status"
+                      className="absolute right-0 top-8 z-50 w-64 select-none rounded-xl border border-gray-200 bg-white/95 p-3 text-xs shadow-xl backdrop-blur-sm ring-1 ring-black/5"
+                      onMouseDown={(e)=>e.stopPropagation()}
+                    >
+                      <div className="mb-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Filtrar Status</div>
+                        <div className="mt-0.5 text-[11px] text-gray-400">Selecione um ou mais estados.</div>
+                      </div>
+
                       <div className="flex flex-wrap gap-1.5">
                         {([
-                          ['OK','OK'],
-                          ['ATTN','Atenção'],
-                          ['OUT','Em falta'],
-                        ] as const).map(([val,label])=> (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => { toggleStatus(val); setPage(1); }}
-                            className={`rounded-full border px-2.5 py-1 transition ${
-                              statusFilter.includes(val)
-                                ? 'border-transparent bg-indigo-600 text-white'
-                                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                            }`}
-                            aria-pressed={statusFilter.includes(val)}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                          ['OK','OK','bg-emerald-500'],
+                          ['ATTN','Atenção','bg-amber-500'],
+                          ['OUT','Em falta','bg-rose-500'],
+                        ] as const).map(([val,label,color])=> {
+                          const active = statusFilter.includes(val);
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => { toggleStatus(val); setPage(1); }}
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${
+                                active
+                                  ? 'border-transparent bg-indigo-600 text-white shadow-sm'
+                                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                              }`}
+                              aria-pressed={active}
+                            >
+                              <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden="true" />
+                              <span>{label}</span>
+                              {active && <Check className="h-3.5 w-3.5 opacity-90" />}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <button type="button" className="rounded border px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50" onClick={()=>{ setStatusFilter([]); setPage(1); }}>Todos</button>
-                        <button type="button" className="rounded border px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50" onClick={()=> setStatusMenuOpen(false)}>Fechar</button>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <button
+                          type="button"
+                          className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                          onClick={()=>{ setStatusFilter([]); setPage(1); }}
+                          title="Limpar filtros"
+                        >
+                          Limpar filtros
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                          onClick={()=> setStatusMenuOpen(false)}
+                          title="Fechar"
+                        >
+                          Fechar
+                        </button>
                       </div>
                     </div>
                   )}
