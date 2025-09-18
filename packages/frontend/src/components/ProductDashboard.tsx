@@ -32,6 +32,16 @@ export function ProductDashboard() {
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [tableSorts, setTableSorts] = useState<Sort[]>([{ by: 'name', dir: 'asc' }]);
+  const togglePrimarySort = (key: 'name' | 'sku' | 'balance') => {
+    setTableSorts((curr) => {
+      const primary = curr[0];
+      if (!primary || primary.by !== key) {
+        return [{ by: key, dir: 'asc' }];
+      }
+      // same key: toggle asc/desc
+      return [{ by: key, dir: primary.dir === 'asc' ? 'desc' : 'asc' }, ...curr.slice(1)];
+    });
+  };
   const qc = useQueryClient();
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -40,6 +50,7 @@ export function ProductDashboard() {
   const [openQuickOutList, setOpenQuickOutList] = useState(false);
   const [openQuickOutHistory, setOpenQuickOutHistory] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithBalance | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { show: showToast } = useToast();
   
   // Log para depuração
@@ -47,10 +58,10 @@ export function ProductDashboard() {
     console.log('selectedProduct atualizado:', selectedProduct);
   }, [selectedProduct]);
   type StatusKey = 'OK' | 'ATTN' | 'OUT';
-  type StatusCycle = 'ALL' | StatusKey;
-  const [statusCycle, setStatusCycle] = useState<StatusCycle>('ALL');
-  const cycleStatus = () =>
-    setStatusCycle((prev) => (prev === 'ALL' ? 'OK' : prev === 'OK' ? 'ATTN' : prev === 'ATTN' ? 'OUT' : 'ALL'));
+  const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]); // vazio = Todos
+  const toggleStatus = (val: StatusKey) =>
+    setStatusFilter((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
@@ -138,14 +149,14 @@ export function ProductDashboard() {
   // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
   const filteredItems = useMemo(() => {
     return items.filter((p) => {
-      if (statusCycle === 'ALL') return true;
       const isOut = p.balance === 0;
       const isAttn = p.balance > 0 && p.balance < p.minStock;
       const isOk = p.balance >= p.minStock;
       const statuses: Record<StatusKey, boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
-      return statuses[statusCycle as StatusKey];
+      const statusOk = statusFilter.length === 0 || statusFilter.some((k) => statuses[k]);
+      return statusOk;
     });
-  }, [items, statusCycle]);
+  }, [items, statusFilter]);
 
   // Aplicar ordenação múltipla client-side adicional (além da primária do backend)
   const viewItems = useMemo(() => {
@@ -181,7 +192,7 @@ export function ProductDashboard() {
               Adicionar Produto
             </Button>
             <Button
-              variant="destructive"
+              variant="secondary"
               size="md"
               onClick={() => {
                 // Abre a lista de produtos para escolher
@@ -191,7 +202,6 @@ export function ProductDashboard() {
               <ArrowDownToLine className="h-4 w-4" />
               Baixa de Produtos
             </Button>
-            {/* Botão de histórico removido: opção disponível dentro do modal de Baixa */}
           </div>
 
       {/* Barra de paginação e ações em massa — movida para baixo da tabela */}
@@ -200,7 +210,7 @@ export function ProductDashboard() {
 
       {/* (removido) Busca e filtros original — será renderizado na faixa da paginação */}
 
-      {/* Faixa com Busca + Filtros (no lugar do total/paginação) */}
+      {/* Faixa com Busca (botão de excluir ao lado direito) */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="w-full sm:max-w-md">
           <Input
@@ -216,61 +226,37 @@ export function ProductDashboard() {
             }}
           />
         </div>
-
-        {/* Botão de Filtros com dropdown */}
-        <div className="relative">
-          <details className="group inline-block">
-            <summary
-              aria-label="Abrir filtros"
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border bg-white px-3.5 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-50 select-none list-none"
-            >
-              <Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-4 w-4" />
-            </summary>
-            <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border bg-white p-3 text-sm shadow-2xl">
-              <div className="mb-2 font-medium text-gray-900">Status</div>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  ['ALL', 'Todos'],
-                  ['OK', 'OK'],
-                  ['ATTN', 'Atenção'],
-                  ['OUT', 'Em falta'],
-                ] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setStatusCycle(val as StatusCycle)}
-                    className={`rounded-full px-3 py-1.5 text-xs border transition ${
-                      statusCycle === val
-                        ? 'border-transparent bg-indigo-600 text-white shadow-sm'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                    aria-pressed={statusCycle === val}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                  Selecione um ou mais status; a lista será atualizada automaticamente.
-                </span>
-                <button
-                  type="button"
-                  className="rounded-md border px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                  onClick={() => {
-                    setSortBy('name');
-                    setSortDir('asc');
-                    setStatusCycle('ALL');
-                    setPage(1);
-                  }}
-                  title="Limpar filtros"
-                >
-                  Limpar
-                </button>
-              </div>
-            </div>
-          </details>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={selectedIds.size === 0}
+            onClick={async () => {
+              if (selectedIds.size === 0) return;
+              const count = selectedIds.size;
+              const ok = window.confirm(`Excluir ${count} produto(s) selecionado(s)? Esta ação também remove as movimentações destes produtos.`);
+              if (!ok) return;
+              try {
+                const ids = Array.from(selectedIds);
+                const ops = ids.map((id) => deleteProduct(id));
+                const results = await Promise.allSettled(ops);
+                const failed = results.filter((r) => r.status === 'rejected');
+                if (failed.length > 0) {
+                  showToast({ type: 'error', message: `Falhou em ${failed.length} de ${results.length} exclusões.` });
+                } else {
+                  showToast({ type: 'success', message: `${results.length} produto(s) excluído(s).` });
+                }
+              } catch (e: any) {
+                showToast({ type: 'error', message: e?.message || 'Erro ao excluir selecionados' });
+              } finally {
+                setSelectedIds(new Set());
+                await qc.invalidateQueries({ queryKey: ['products'] });
+              }
+            }}
+            title={selectedIds.size ? `${selectedIds.size} selecionado(s)` : 'Selecione itens para excluir'}
+          >
+            Excluir
+          </Button>
         </div>
       </div>
 
@@ -279,13 +265,61 @@ export function ProductDashboard() {
           {(() => {
           const columns: Column<ProductWithBalance & { __actions?: true }>[] = [
             {
+              key: '__select',
+              header: '',
+              width: 'w-[4%]',
+              // Remover seletor geral no cabeçalho (deixar cabeçalho vazio)
+              headerRender: <span className="sr-only">Selecionar</span>,
+              render: (row) => {
+                const p = row as ProductWithBalance;
+                const checked = selectedIds.has(p.id);
+                return (
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${p.name}`}
+                    checked={checked}
+                    onChange={(e) => {
+                      const isChecked = e.currentTarget.checked;
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (isChecked) next.add(p.id);
+                        else next.delete(p.id);
+                        return next;
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                  />
+                );
+              },
+            },
+            {
               key: 'name',
               header: 'Nome do Produto',
-              sortable: true,
-              width: 'w-[38%]',
+              sortable: false,
+              width: 'w-[36%]',
+              headerRender: (
+                <button
+                  type="button"
+                  className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white select-none"
+                  onClick={() => togglePrimarySort('name')}
+                  title="Ordenar por Nome"
+                >
+                  <span className="select-none cursor-default inline-block text-gray-700">Nome do Produto</span>
+                  <span className={`transition-transform text-gray-400 group-hover:text-gray-700 ${tableSorts[0]?.by==='name' && tableSorts[0]?.dir==='desc' ? 'rotate-180' : ''}`}>▲</span>
+                </button>
+              ),
               render: (p) => (
-                <div className="cursor-pointer" onClick={() => toggleExpanded((p as ProductWithBalance).id)} title="Ver descrição">
-                  <div className="text-sm text-gray-900">{(p as ProductWithBalance).name}</div>
+                <div
+                  className="cursor-pointer"
+                  onClick={() => {
+                    // Evita abrir/fechar ao selecionar texto do nome
+                    const sel = typeof window !== 'undefined' ? window.getSelection()?.toString() : '';
+                    if (sel && sel.length > 0) return;
+                    toggleExpanded((p as ProductWithBalance).id);
+                  }}
+                  title="Ver descrição"
+                >
+                  <div className="text-sm text-gray-900 select-none">{(p as ProductWithBalance).name}</div>
                   {expandedIds[(p as ProductWithBalance).id] && (
                     <div className="mt-2 rounded-md border border-gray-200 bg-white p-3 text-xs text-gray-700">
                       <div className="mb-1 font-medium text-gray-800">Descrição</div>
@@ -298,8 +332,19 @@ export function ProductDashboard() {
             {
               key: 'sku',
               header: 'SKU',
-              sortable: true,
-              width: 'w-[22%]',
+              sortable: false,
+              width: 'w-[20%]',
+              headerRender: (
+                <button
+                  type="button"
+                  className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white select-none"
+                  onClick={() => togglePrimarySort('sku')}
+                  title="Ordenar por SKU"
+                >
+                  <span className="select-none cursor-default inline-block text-gray-700">SKU</span>
+                  <span className={`transition-transform text-gray-400 group-hover:text-gray-700 ${tableSorts[0]?.by==='sku' && tableSorts[0]?.dir==='desc' ? 'rotate-180' : ''}`}>▲</span>
+                </button>
+              ),
               render: (p) => (
                 <span
                   className="cursor-pointer text-sm font-medium tracking-wide text-gray-500 hover:text-gray-700 uppercase"
@@ -312,9 +357,20 @@ export function ProductDashboard() {
             {
               key: 'balance',
               header: 'Saldo Atual',
-              sortable: true,
+              sortable: false,
               align: 'right',
-              width: 'w-[14%]',
+              width: 'w-[12%]',
+              headerRender: (
+                <button
+                  type="button"
+                  className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white select-none"
+                  onClick={() => togglePrimarySort('balance')}
+                  title="Ordenar por Saldo"
+                >
+                  <span className="select-none cursor-default inline-block text-gray-700">Saldo Atual</span>
+                  <span className={`transition-transform text-gray-400 group-hover:text-gray-700 ${tableSorts[0]?.by==='balance' && tableSorts[0]?.dir==='desc' ? 'rotate-180' : ''}`}>▲</span>
+                </button>
+              ),
               render: (p) => {
                 const it = p as ProductWithBalance;
                 const isOut = it.balance === 0;
@@ -328,22 +384,54 @@ export function ProductDashboard() {
             {
               key: 'status',
               header: 'Status',
-              width: 'w-[16%]',
+              width: 'w-[14%]',
               headerRender: (
-                <button
-                  type="button"
-                  className="group inline-flex items-center gap-2 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                  onClick={() => {
-                    cycleStatus();
-                    setPage(1);
-                  }}
-                  title="Filtrar por Status (clique para alternar)"
-                >
-                  <span>Status</span>
-                  <span className="rounded-full border px-2 py-0.5 text-[10px] text-gray-600">
-                    {statusCycle === 'ALL' ? 'Todos' : statusCycle === 'OK' ? 'OK' : statusCycle === 'ATTN' ? 'Atenção' : 'Em falta'}
-                  </span>
-                </button>
+                <div className="relative inline-flex items-center gap-1">
+                  <span className="text-[11px] font-semibold tracking-wide text-gray-600 select-none cursor-default">Status</span>
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded px-1 py-0.5 text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStatusMenuOpen((v) => !v);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={statusMenuOpen}
+                    title="Filtrar por Status"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                  {statusMenuOpen && (
+                    <div className="absolute right-0 top-6 z-50 w-48 rounded-md border bg-white p-2 text-xs shadow-lg" onMouseDown={(e)=>e.stopPropagation()}>
+                      <div className="mb-1 text-gray-700">Filtrar status</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {([
+                          ['OK','OK'],
+                          ['ATTN','Atenção'],
+                          ['OUT','Em falta'],
+                        ] as const).map(([val,label])=> (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => { toggleStatus(val); setPage(1); }}
+                            className={`rounded-full border px-2.5 py-1 transition ${
+                              statusFilter.includes(val)
+                                ? 'border-transparent bg-indigo-600 text-white'
+                                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                            }`}
+                            aria-pressed={statusFilter.includes(val)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <button type="button" className="rounded border px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50" onClick={()=>{ setStatusFilter([]); setPage(1); }}>Todos</button>
+                        <button type="button" className="rounded border px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50" onClick={()=> setStatusMenuOpen(false)}>Fechar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ),
               render: (p) => {
                 const it = p as ProductWithBalance;
