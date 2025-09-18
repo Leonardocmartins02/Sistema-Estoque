@@ -28,18 +28,21 @@ export function ProductDashboard() {
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // Exibir todos os produtos: usar um pageSize alto
+  const [pageSize, setPageSize] = useState(1000);
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [tableSorts, setTableSorts] = useState<Sort[]>([{ by: 'name', dir: 'asc' }]);
   const togglePrimarySort = (key: 'name' | 'sku' | 'balance') => {
     setTableSorts((curr) => {
       const primary = curr[0];
-      if (!primary || primary.by !== key) {
-        return [{ by: key, dir: 'asc' }];
-      }
-      // same key: toggle asc/desc
-      return [{ by: key, dir: primary.dir === 'asc' ? 'desc' : 'asc' }, ...curr.slice(1)];
+      const nextDir = !primary || primary.by !== key ? 'asc' : primary.dir === 'asc' ? 'desc' : 'asc';
+      const nextSorts = [{ by: key, dir: nextDir }, ...(primary && primary.by === key ? curr.slice(1) : curr.slice(0))];
+      // Reflete no estado de ordenação do backend
+      setSortBy(key);
+      setSortDir(nextDir as any);
+      setPage(1);
+      return nextSorts as any;
     });
   };
 
@@ -260,9 +263,9 @@ export function ProductDashboard() {
 
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
   const total = query.data?.total ?? 0;
-  const currentPage = query.data?.page ?? page;
-  const currentPageSize = query.data?.pageSize ?? pageSize;
-  const totalPages = Math.max(Math.ceil(total / currentPageSize), 1);
+  const currentPage = 1;
+  const currentPageSize = pageSize;
+  const totalPages = 1;
 
   // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
   const filteredItems = useMemo(() => {
