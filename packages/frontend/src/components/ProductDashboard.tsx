@@ -19,6 +19,7 @@ import Card from './ui/Card';
 import Badge from './ui/Badge';
 import { createPortal } from 'react-dom';
 import { QuickOutModal } from './QuickOutModal';
+import QuickOutListModal from './QuickOutListModal';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
@@ -35,6 +36,7 @@ export function ProductDashboard() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState(false);
   const [openQuickOut, setOpenQuickOut] = useState(false);
+  const [openQuickOutList, setOpenQuickOutList] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithBalance | null>(null);
   const { show: showToast } = useToast();
   
@@ -179,11 +181,8 @@ export function ProductDashboard() {
               variant="destructive"
               size="md"
               onClick={() => {
-                if (!selectedProduct) {
-                  showToast({ type: 'info', message: 'Selecione um produto na tabela para dar baixa.' });
-                  return;
-                }
-                setOpenQuickOut(true);
+                // Abre a lista de produtos para escolher
+                setOpenQuickOutList(true);
               }}
             >
               <ArrowDownToLine className="h-4 w-4" />
@@ -846,6 +845,17 @@ export function ProductDashboard() {
           open={openHistory}
           onOpenChange={setOpenHistory}
           productId={selectedProductId || ''}
+        />
+        <QuickOutListModal
+          open={openQuickOutList}
+          onOpenChange={setOpenQuickOutList}
+          items={filteredItems}
+          loading={query.isLoading}
+          onPick={(p) => {
+            setSelectedProduct(p);
+            setOpenQuickOutList(false);
+            setOpenQuickOut(true);
+          }}
         />
         {selectedProduct && (
           <QuickOutModal
