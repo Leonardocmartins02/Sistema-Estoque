@@ -1,6 +1,9 @@
 import type { Product, ProductWithBalance } from './types';
 
-const API_PREFIX = '/api';
+// Base da API: em produção, defina VITE_API_BASE (ex.: https://sua-api.com)
+// Em desenvolvimento, deixa vazio para usar o proxy do Vite ("/api").
+const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? '';
+const API_PREFIX = `${API_BASE}/api`;
 
 export async function fetchProducts(
   search: string,
