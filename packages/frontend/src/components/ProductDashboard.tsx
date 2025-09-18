@@ -188,68 +188,8 @@ export function ProductDashboard() {
             >
               <Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-4 w-4" />
             </summary>
-            <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border bg-white p-3 text-sm shadow-xl">
-              <div className="mb-3">
-                <div className="mb-2 font-medium text-gray-800">Ordenação</div>
-                <div className="flex items-center gap-2">
-                  <div className="inline-flex rounded-md border bg-gray-50 p-1">
-                    {([
-                      ['name', 'Nome'],
-                      ['sku', 'SKU'],
-                      ['balance', 'Saldo'],
-                    ] as const).map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setSortBy(key);
-                          setPage(1);
-                        }}
-                        className={`px-3 py-1.5 text-xs font-medium rounded ${
-                          sortBy === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
-                        }`}
-                        aria-pressed={sortBy === key}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="inline-flex rounded-md border bg-gray-50 p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortDir('asc');
-                        setPage(1);
-                      }}
-                      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${
-                        sortDir === 'asc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                      aria-pressed={sortDir === 'asc'}
-                      title="Crescente"
-                    >
-                      <ArrowUpWideNarrow className="h-3.5 w-3.5" /> ASC
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortDir('desc');
-                        setPage(1);
-                      }}
-                      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs ${
-                        sortDir === 'desc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-800'
-                      }`}
-                      aria-pressed={sortDir === 'desc'}
-                      title="Decrescente"
-                    >
-                      <ArrowDownNarrowWide className="h-3.5 w-3.5" /> DESC
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="my-3 h-px bg-gray-200" />
-
-              <div className="mb-2 font-medium text-gray-800">Status</div>
+            <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border bg-white p-3 text-sm shadow-2xl">
+              <div className="mb-2 font-medium text-gray-900">Status</div>
               <div className="flex flex-wrap gap-2">
                 {([
                   ['ALL', 'Todos'],
@@ -263,7 +203,7 @@ export function ProductDashboard() {
                     onClick={() => setStatusFilter(val)}
                     className={`rounded-full px-3 py-1.5 text-xs border transition ${
                       statusFilter === val
-                        ? 'border-brand bg-brand text-white shadow-sm'
+                        ? 'border-transparent bg-indigo-600 text-white shadow-sm'
                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                     }`}
                     aria-pressed={statusFilter === val}
@@ -275,7 +215,7 @@ export function ProductDashboard() {
 
               <div className="mt-3 flex items-center justify-between">
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                  <ArrowUpDown className="h-3.5 w-3.5" /> Ajuste os filtros e a lista será atualizada.
+                  Ajuste o status e a lista será atualizada.
                 </span>
                 <button
                   type="button"
