@@ -10,7 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './ui/ToastProvider';
 import { createMovement } from '../api/movements';
 import { deleteProduct, createProduct } from '../api/products';
-import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow, Filter, Plus } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Search, ArrowUpDown, ArrowDownNarrowWide, ArrowUpWideNarrow, Filter, Plus, ArrowDownToLine } from 'lucide-react';
 import { DataTable, type Column, type Sort } from './ui/DataTable';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -18,6 +18,7 @@ import { Select } from './ui/Select';
 import Card from './ui/Card';
 import Badge from './ui/Badge';
 import { createPortal } from 'react-dom';
+import { QuickOutModal } from './QuickOutModal';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
@@ -32,10 +33,23 @@ export function ProductDashboard() {
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState(false);
+  const [openQuickOut, setOpenQuickOut] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithBalance | null>(null);
   const { show: showToast } = useToast();
+  
+  // Log para depuração
+  useEffect(() => {
+    console.log('selectedProduct atualizado:', selectedProduct);
+  }, [selectedProduct]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OK' | 'ATTN' | 'OUT'>('ALL');
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  // Função para abrir o modal de baixa rápida
+  const handleOpenQuickOut = (product: ProductWithBalance) => {
+    setSelectedProduct(product);
+    setOpenQuickOut(true);
+  };
 
   const toggleExpanded = (id: string) => setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
 
@@ -284,7 +298,7 @@ export function ProductDashboard() {
 
       {/* Tabela (desktop/tablet) com DataTable */}
       <div className="mt-6 hidden md:block">
-        {(() => {
+          {(() => {
           const columns: Column<ProductWithBalance & { __actions?: true }>[] = [
             {
               key: 'name',
@@ -355,18 +369,33 @@ export function ProductDashboard() {
                 const p = row as ProductWithBalance;
                 return (
                   <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      className="rounded-full border px-3.5 py-1.5 text-sm hover:bg-gray-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProductId(p.id);
-                        setOpenMove(true);
-                      }}
-                      title="Lançar entrada/saída"
-                    >
-                      Movimentar
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="rounded-full border px-3.5 py-1.5 text-sm hover:bg-gray-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProductId(p.id);
+                          setOpenMove(true);
+                        }}
+                        title="Lançar entrada/saída"
+                      >
+                        Movimentar
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border p-1.5 text-sm text-red-600 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('Botão de baixa rápida clicado para o produto:', p);
+                          setSelectedProduct(p);
+                          setOpenQuickOut(true);
+                        }}
+                        title="Dar baixa rápida"
+                      >
+                        <ArrowDownToLine className="h-4 w-4" />
+                      </button>
+                    </div>
                     <ActionMenu
                       trigger={({ onClick }) => (
                         <button
@@ -656,7 +685,8 @@ export function ProductDashboard() {
       </div>
 
       {/* Barra de paginação e ações em massa (abaixo da tabela) */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Controles de paginação */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -808,6 +838,34 @@ export function ProductDashboard() {
             </Card>
           );
         })}
+        <MovementFormModal
+          open={openMove}
+          onOpenChange={setOpenMove}
+          productId={selectedProductId || ''}
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+        <MovementHistoryModal
+          open={openHistory}
+          onOpenChange={setOpenHistory}
+          productId={selectedProductId || ''}
+        />
+        {selectedProduct && (
+          <QuickOutModal
+            open={openQuickOut}
+            onOpenChange={setOpenQuickOut}
+            product={{
+              id: selectedProduct.id,
+              name: selectedProduct.name,
+              sku: selectedProduct.sku,
+              currentBalance: selectedProduct.balance || 0,
+            }}
+            onSuccess={() => {
+              qc.invalidateQueries({ queryKey: ['products'] });
+            }}
+          />
+        )}
       </div>
 
       <ProductFormModal
