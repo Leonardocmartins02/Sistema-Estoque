@@ -9,6 +9,8 @@ export type Column<T> = {
   align?: Align;
   sortable?: boolean;
   render?: (row: T) => React.ReactNode;
+  // Renderizador opcional de filtro por coluna (aparece em uma linha abaixo do cabeçalho)
+  filterRender?: React.ReactNode;
 };
 
 export type Sort = { by: string; dir: 'asc' | 'desc' };
@@ -16,8 +18,12 @@ export type Sort = { by: string; dir: 'asc' | 'desc' };
 export type DataTableProps<T> = {
   columns: Column<T>[];
   items: T[];
+  // Ordenação simples (legado)
   sort?: Sort;
   onSortChange?: (next: Sort) => void;
+  // Ordenação múltipla (preferencial)
+  sorts?: Sort[];
+  onSortsChange?: (next: Sort[]) => void;
   isLoading?: boolean;
   error?: string | null;
   empty?: React.ReactNode;
@@ -31,6 +37,8 @@ export function DataTable<T>({
   items,
   sort,
   onSortChange,
+  sorts,
+  onSortsChange,
   isLoading,
   error,
   empty,
@@ -38,10 +46,44 @@ export function DataTable<T>({
   className = '',
   footer,
 }: DataTableProps<T>) {
-  const handleSort = (col: Column<T>) => {
-    if (!col.sortable || !onSortChange) return;
-    const nextDir = sort?.by === String(col.key) && sort?.dir === 'asc' ? 'desc' : 'asc';
-    onSortChange({ by: String(col.key), dir: nextDir });
+  const handleSort = (e: React.MouseEvent, col: Column<T>) => {
+    if (!col.sortable) return;
+    const colKey = String(col.key);
+    // Preferir ordenação múltipla quando disponível
+    if (onSortsChange) {
+      const current = sorts ?? [];
+      const idx = current.findIndex((s) => s.by === colKey);
+      let next: Sort[] = [];
+      const shift = e.shiftKey;
+      if (idx === -1) {
+        // adicionar asc
+        next = shift ? [...current, { by: colKey, dir: 'asc' }] : [{ by: colKey, dir: 'asc' }];
+      } else {
+        const existing = current[idx];
+        if (existing.dir === 'asc') {
+          // alterna para desc
+          next = [...current.slice(0, idx), { by: colKey, dir: 'desc' }, ...current.slice(idx + 1)];
+        } else {
+          // remover da lista
+          next = [...current.slice(0, idx), ...current.slice(idx + 1)];
+          if (!shift && next.length === 0) {
+            // se não segurar shift e removemos tudo, deixar somente asc
+            next = [{ by: colKey, dir: 'asc' }];
+          }
+        }
+        if (!shift) {
+          // sem shift, manter apenas esta coluna
+          const self = next.find((s) => s.by === colKey) ?? { by: colKey, dir: 'asc' };
+          next = [self];
+        }
+      }
+      onSortsChange(next);
+      return;
+    }
+    // Fallback para ordenação simples
+    if (!onSortChange) return;
+    const nextDir = sort?.by === colKey && sort?.dir === 'asc' ? 'desc' : 'asc';
+    onSortChange({ by: colKey, dir: nextDir });
   };
 
   const alignClass = (align?: Align) =>
@@ -61,8 +103,14 @@ export function DataTable<T>({
           <thead className="bg-gray-50" role="rowgroup">
             <tr role="row">
               {columns.map((col) => {
-                const isSorted = sort?.by === String(col.key);
-                const dir = isSorted ? sort?.dir : undefined;
+                const isSorted = sorts
+                  ? (sorts ?? []).some((s) => s.by === String(col.key))
+                  : sort?.by === String(col.key);
+                const dir = sorts
+                  ? (sorts ?? []).find((s) => s.by === String(col.key))?.dir
+                  : isSorted
+                  ? sort?.dir
+                  : undefined;
                 return (
                   <th
                     key={String(col.key)}
@@ -76,7 +124,7 @@ export function DataTable<T>({
                     {col.sortable ? (
                       <button
                         type="button"
-                        onClick={() => handleSort(col)}
+                        onClick={(ev) => handleSort(ev, col)}
                         className="group inline-flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded"
                         aria-label={`Ordenar por ${col.header}`}
                         title={`Ordenar por ${col.header}`}
@@ -98,6 +146,17 @@ export function DataTable<T>({
                 );
               })}
             </tr>
+            {columns.some((c) => !!c.filterRender) && (
+              <tr role="row">
+                {columns.map((col) => (
+                  <th key={String(col.key)} className={`px-4 pb-3 pt-0 text-xs font-normal text-gray-600 ${
+                    col.width || ''
+                  }`}>
+                    {col.filterRender ?? null}
+                  </th>
+                ))}
+              </tr>
+            )}
           </thead>
 
           <tbody role="rowgroup">

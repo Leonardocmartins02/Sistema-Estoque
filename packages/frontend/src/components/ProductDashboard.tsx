@@ -29,6 +29,7 @@ export function ProductDashboard() {
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [tableSorts, setTableSorts] = useState<Sort[]>([{ by: 'name', dir: 'asc' }]);
   const qc = useQueryClient();
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -45,6 +46,8 @@ export function ProductDashboard() {
   const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]); // vazio = Todos
   const toggleStatus = (val: StatusKey) =>
     setStatusFilter((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
+  const [nameFilter, setNameFilter] = useState('');
+  const [skuFilter, setSkuFilter] = useState('');
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
@@ -131,16 +134,46 @@ export function ProductDashboard() {
 
   // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
   const filteredItems = useMemo(() => {
-    if (!statusFilter.length) return items; // sem seleção = Todos
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const nf = normalize(nameFilter.trim());
+    const sf = normalize(skuFilter.trim());
+
     return items.filter((p) => {
       const isOut = p.balance === 0;
       const isAttn = p.balance > 0 && p.balance < p.minStock;
       const isOk = p.balance >= p.minStock;
       const statuses: Record<StatusKey, boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
-      // item passa se algum status selecionado for verdadeiro
-      return statusFilter.some((k) => statuses[k]);
+
+      const statusOk = !statusFilter.length || statusFilter.some((k) => statuses[k]);
+      const nameOk = !nf || normalize(p.name).includes(nf);
+      const skuOk = !sf || normalize(p.sku).includes(sf);
+      return statusOk && nameOk && skuOk;
     });
-  }, [items, statusFilter]);
+  }, [items, statusFilter, nameFilter, skuFilter]);
+
+  // Aplicar ordenação múltipla client-side adicional (além da primária do backend)
+  const viewItems = useMemo(() => {
+    if (!tableSorts || tableSorts.length <= 1) return filteredItems;
+    const secondarySorts = tableSorts.slice(1) as Sort[];
+    const arr = [...filteredItems];
+    arr.sort((a: any, b: any) => {
+      for (const s of secondarySorts) {
+        let av: any = a[s.by];
+        let bv: any = b[s.by];
+        if (typeof av === 'string') av = av.toLowerCase();
+        if (typeof bv === 'string') bv = bv.toLowerCase();
+        if (av < bv) return s.dir === 'asc' ? -1 : 1;
+        if (av > bv) return s.dir === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+    return arr;
+  }, [filteredItems, tableSorts]);
 
   return (
     <section aria-labelledby="products-heading" className="mt-8">
@@ -259,6 +292,18 @@ export function ProductDashboard() {
               key: 'name',
               header: 'Nome do Produto',
               sortable: true,
+              filterRender: (
+                <input
+                  type="text"
+                  placeholder="Filtrar nome"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
+                  value={nameFilter}
+                  onChange={(e) => {
+                    setNameFilter(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              ),
               render: (p) => (
                 <div className="cursor-pointer" onClick={() => toggleExpanded((p as ProductWithBalance).id)} title="Ver descrição">
                   <div className="text-sm text-gray-900">{(p as ProductWithBalance).name}</div>
@@ -275,6 +320,18 @@ export function ProductDashboard() {
               key: 'sku',
               header: 'SKU',
               sortable: true,
+              filterRender: (
+                <input
+                  type="text"
+                  placeholder="Filtrar SKU"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
+                  value={skuFilter}
+                  onChange={(e) => {
+                    setSkuFilter(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              ),
               render: (p) => (
                 <span
                   className="cursor-pointer text-sm font-medium tracking-wide text-gray-500 hover:text-gray-700 uppercase"
@@ -302,6 +359,29 @@ export function ProductDashboard() {
             {
               key: 'status',
               header: 'Status',
+              filterRender: (
+                <div className="flex flex-wrap gap-1">
+                  {([
+                    ['OK', 'OK'],
+                    ['ATTN', 'Atenção'],
+                    ['OUT', 'Em falta'],
+                  ] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => toggleStatus(val)}
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] border transition ${
+                        statusFilter.includes(val)
+                          ? 'border-transparent bg-indigo-600 text-white'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                      aria-pressed={statusFilter.includes(val)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ),
               render: (p) => {
                 const it = p as ProductWithBalance;
                 const isOut = it.balance === 0;
@@ -447,15 +527,18 @@ export function ProductDashboard() {
           return (
             <DataTable<ProductWithBalance>
               columns={columns as any}
-              items={filteredItems}
+              items={viewItems}
               getRowId={(p) => p.id}
-              sort={sort}
-              onSortChange={(s) => {
-                setPage(1);
-                if (s.by === 'name' || s.by === 'sku' || s.by === 'balance') {
-                  setSortBy(s.by);
+              // Multi-ordenação com Shift + clique no cabeçalho
+              sorts={tableSorts}
+              onSortsChange={(next) => {
+                setTableSorts(next);
+                const primary = next[0];
+                if (primary && (primary.by === 'name' || primary.by === 'sku' || primary.by === 'balance')) {
+                  setSortBy(primary.by as any);
+                  setSortDir(primary.dir);
                 }
-                setSortDir(s.dir);
+                setPage(1);
               }}
               isLoading={query.isLoading}
               error={query.isError ? (query.error as Error)?.message || 'Erro ao carregar produtos' : null}
