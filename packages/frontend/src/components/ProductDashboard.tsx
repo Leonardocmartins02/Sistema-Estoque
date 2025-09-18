@@ -170,10 +170,24 @@ export function ProductDashboard() {
             Produtos
           </h2>
           <p className="text-sm text-gray-500">Gerencie o cadastro e o estoque</p>
-          <div className="mt-6">
+          <div className="mt-6 flex items-center gap-2">
             <Button variant="primary" size="md" onClick={() => setOpenCreate(true)}>
               <Plus className="h-4 w-4" />
               Adicionar Produto
+            </Button>
+            <Button
+              variant="destructive"
+              size="md"
+              onClick={() => {
+                if (!selectedProduct) {
+                  showToast({ type: 'info', message: 'Selecione um produto na tabela para dar baixa.' });
+                  return;
+                }
+                setOpenQuickOut(true);
+              }}
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              Baixa de Produtos
             </Button>
           </div>
 
