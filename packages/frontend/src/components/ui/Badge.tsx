@@ -17,7 +17,7 @@ const styles: Record<Variant, string> = {
 
 export const Badge: React.FC<BadgeProps> = ({ variant = 'neutral', className = '', children, ...props }) => (
   <span
-    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[variant]} ${className}`}
+    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[variant]} ${className} transition-transform duration-150 ease-out will-change-transform hover:scale-[1.02]`}
     {...props}
   >
     {children}

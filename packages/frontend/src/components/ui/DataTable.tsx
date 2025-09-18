@@ -92,7 +92,7 @@ export function DataTable<T>({
     align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
 
   return (
-    <div className={`overflow-hidden rounded-lg border bg-white shadow-sm ${className}`}>
+    <div className={`overflow-hidden rounded-lg border bg-white shadow-sm select-none ${className}`}>
       {error && (
         <div className="border-b border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
       )}
@@ -108,7 +108,7 @@ export function DataTable<T>({
               <col key={String(col.key)} className={col.width || ''} />
             ))}
           </colgroup>
-          <thead className="bg-gray-50" role="rowgroup">
+          <thead className="bg-gray-50/90 backdrop-blur-sm select-none" role="rowgroup">
             <tr role="row">
               {columns.map((col) => {
                 const isSorted = sorts
@@ -125,7 +125,7 @@ export function DataTable<T>({
                     scope="col"
                     role="columnheader"
                     aria-sort={isSorted ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className={`px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-600 ${
+                    className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600 first:rounded-tl-lg last:rounded-tr-lg select-none whitespace-nowrap ${
                       alignClass(col.align)
                     } ${col.width || ''}`}
                   >
@@ -135,11 +135,11 @@ export function DataTable<T>({
                       <button
                         type="button"
                         onClick={(ev) => handleSort(ev, col)}
-                        className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                        className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white select-none"
                         aria-label={`Ordenar por ${col.header}`}
                         title={`Ordenar por ${col.header}`}
                       >
-                        <span>{col.header}</span>
+
                         <span
                           aria-hidden="true"
                           className={`transition-transform text-gray-400 group-hover:text-gray-700 ${
@@ -150,7 +150,7 @@ export function DataTable<T>({
                         </span>
                       </button>
                     ) : (
-                      col.header
+                      <span className="inline-block text-gray-700">{col.header}</span>
                     )}
                   </th>
                 );
@@ -171,7 +171,7 @@ export function DataTable<T>({
             )}
           </thead>
 
-          <tbody role="rowgroup">
+          <tbody role="rowgroup" className="select-none">
             {items.length === 0 && !isLoading ? (
               <tr role="row">
                 <td role="cell" colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
@@ -192,7 +192,7 @@ export function DataTable<T>({
                       <td
                         key={String(col.key)}
                         role="cell"
-                        className={`border-t border-gray-100 px-4 py-3 text-sm text-gray-800 ${alignClass(
+                        className={`border-t border-gray-100 px-4 py-3 text-sm text-gray-800 select-none ${alignClass(
                           col.align
                         )}`}
                       >
