@@ -20,6 +20,7 @@ import Badge from './ui/Badge';
 import { createPortal } from 'react-dom';
 import { QuickOutModal } from './QuickOutModal';
 import QuickOutListModal from './QuickOutListModal';
+import QuickOutHistoryModal from './QuickOutHistoryModal';
 
 export function ProductDashboard() {
   const [search, setSearch] = useState('');
@@ -37,6 +38,7 @@ export function ProductDashboard() {
   const [openHistory, setOpenHistory] = useState(false);
   const [openQuickOut, setOpenQuickOut] = useState(false);
   const [openQuickOutList, setOpenQuickOutList] = useState(false);
+  const [openQuickOutHistory, setOpenQuickOutHistory] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithBalance | null>(null);
   const { show: showToast } = useToast();
   
@@ -45,9 +47,10 @@ export function ProductDashboard() {
     console.log('selectedProduct atualizado:', selectedProduct);
   }, [selectedProduct]);
   type StatusKey = 'OK' | 'ATTN' | 'OUT';
-  const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]); // vazio = Todos
-  const toggleStatus = (val: StatusKey) =>
-    setStatusFilter((prev) => (prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]));
+  type StatusCycle = 'ALL' | StatusKey;
+  const [statusCycle, setStatusCycle] = useState<StatusCycle>('ALL');
+  const cycleStatus = () =>
+    setStatusCycle((prev) => (prev === 'ALL' ? 'OK' : prev === 'OK' ? 'ATTN' : prev === 'ATTN' ? 'OUT' : 'ALL'));
   const [editInitial, setEditInitial] = useState<Partial<ProductWithBalance> | null>(null);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
@@ -135,14 +138,14 @@ export function ProductDashboard() {
   // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
   const filteredItems = useMemo(() => {
     return items.filter((p) => {
+      if (statusCycle === 'ALL') return true;
       const isOut = p.balance === 0;
       const isAttn = p.balance > 0 && p.balance < p.minStock;
       const isOk = p.balance >= p.minStock;
       const statuses: Record<StatusKey, boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
-      const statusOk = !statusFilter.length || statusFilter.some((k) => statuses[k]);
-      return statusOk;
+      return statuses[statusCycle as StatusKey];
     });
-  }, [items, statusFilter]);
+  }, [items, statusCycle]);
 
   // Aplicar ordenação múltipla client-side adicional (além da primária do backend)
   const viewItems = useMemo(() => {
@@ -188,6 +191,7 @@ export function ProductDashboard() {
               <ArrowDownToLine className="h-4 w-4" />
               Baixa de Produtos
             </Button>
+            {/* Botão de histórico removido: opção disponível dentro do modal de Baixa */}
           </div>
 
       {/* Barra de paginação e ações em massa — movida para baixo da tabela */}
@@ -225,21 +229,8 @@ export function ProductDashboard() {
             <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border bg-white p-3 text-sm shadow-2xl">
               <div className="mb-2 font-medium text-gray-900">Status</div>
               <div className="flex flex-wrap gap-2">
-                {/* Todos (limpa seleção) */}
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter([])}
-                  className={`rounded-full px-3 py-1.5 text-xs border transition ${
-                    !statusFilter.length
-                      ? 'border-transparent bg-indigo-600 text-white shadow-sm'
-                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                  aria-pressed={!statusFilter.length}
-                >
-                  Todos
-                </button>
-                {/* Seleção múltipla */}
                 {([
+                  ['ALL', 'Todos'],
                   ['OK', 'OK'],
                   ['ATTN', 'Atenção'],
                   ['OUT', 'Em falta'],
@@ -247,13 +238,13 @@ export function ProductDashboard() {
                   <button
                     key={val}
                     type="button"
-                    onClick={() => toggleStatus(val)}
+                    onClick={() => setStatusCycle(val as StatusCycle)}
                     className={`rounded-full px-3 py-1.5 text-xs border transition ${
-                      statusFilter.includes(val)
+                      statusCycle === val
                         ? 'border-transparent bg-indigo-600 text-white shadow-sm'
                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                     }`}
-                    aria-pressed={statusFilter.includes(val)}
+                    aria-pressed={statusCycle === val}
                   >
                     {label}
                   </button>
@@ -270,7 +261,7 @@ export function ProductDashboard() {
                   onClick={() => {
                     setSortBy('name');
                     setSortDir('asc');
-                    setStatusFilter([]);
+                    setStatusCycle('ALL');
                     setPage(1);
                   }}
                   title="Limpar filtros"
@@ -338,6 +329,22 @@ export function ProductDashboard() {
               key: 'status',
               header: 'Status',
               width: 'w-[16%]',
+              headerRender: (
+                <button
+                  type="button"
+                  className="group inline-flex items-center gap-2 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  onClick={() => {
+                    cycleStatus();
+                    setPage(1);
+                  }}
+                  title="Filtrar por Status (clique para alternar)"
+                >
+                  <span>Status</span>
+                  <span className="rounded-full border px-2 py-0.5 text-[10px] text-gray-600">
+                    {statusCycle === 'ALL' ? 'Todos' : statusCycle === 'OK' ? 'OK' : statusCycle === 'ATTN' ? 'Atenção' : 'Em falta'}
+                  </span>
+                </button>
+              ),
               render: (p) => {
                 const it = p as ProductWithBalance;
                 const isOut = it.balance === 0;
@@ -851,11 +858,16 @@ export function ProductDashboard() {
           onOpenChange={setOpenQuickOutList}
           items={filteredItems}
           loading={query.isLoading}
+          onOpenHistory={() => setOpenQuickOutHistory(true)}
           onPick={(p) => {
             setSelectedProduct(p);
             setOpenQuickOutList(false);
             setOpenQuickOut(true);
           }}
+        />
+        <QuickOutHistoryModal
+          open={openQuickOutHistory}
+          onOpenChange={setOpenQuickOutHistory}
         />
         {selectedProduct && (
           <QuickOutModal

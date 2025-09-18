@@ -5,6 +5,8 @@ type Align = 'left' | 'center' | 'right';
 export type Column<T> = {
   key: keyof T | string;
   header: string;
+  // Cabeçalho custom (render). Se presente, tem precedência sobre o comportamento padrão
+  headerRender?: React.ReactNode;
   width?: string; // ex.: 'w-1/3' ou classes tailwind
   align?: Align;
   sortable?: boolean;
@@ -99,7 +101,13 @@ export function DataTable<T>({
       )}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full border-separate border-spacing-0" role="table">
+        <table className="min-w-full table-fixed border-separate border-spacing-0" role="table">
+          {/* Colgroup mantém larguras estáveis entre thead/tbody */}
+          <colgroup>
+            {columns.map((col) => (
+              <col key={String(col.key)} className={col.width || ''} />
+            ))}
+          </colgroup>
           <thead className="bg-gray-50" role="rowgroup">
             <tr role="row">
               {columns.map((col) => {
@@ -121,18 +129,20 @@ export function DataTable<T>({
                       alignClass(col.align)
                     } ${col.width || ''}`}
                   >
-                    {col.sortable ? (
+                    {col.headerRender ? (
+                      col.headerRender
+                    ) : col.sortable ? (
                       <button
                         type="button"
                         onClick={(ev) => handleSort(ev, col)}
-                        className="group inline-flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white rounded"
+                        className="group inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                         aria-label={`Ordenar por ${col.header}`}
                         title={`Ordenar por ${col.header}`}
                       >
                         <span>{col.header}</span>
                         <span
                           aria-hidden="true"
-                          className={`transition-transform text-gray-400 group-hover:text-gray-600 ${
+                          className={`transition-transform text-gray-400 group-hover:text-gray-700 ${
                             isSorted && dir === 'desc' ? 'rotate-180' : ''
                           }`}
                         >
@@ -147,11 +157,13 @@ export function DataTable<T>({
               })}
             </tr>
             {columns.some((c) => !!c.filterRender) && (
-              <tr role="row">
+              <tr role="row" className="bg-gray-50">
                 {columns.map((col) => (
-                  <th key={String(col.key)} className={`px-4 pb-3 pt-0 text-xs font-normal text-gray-600 ${
-                    col.width || ''
-                  }`}>
+                  <th
+                    key={String(col.key)}
+                    className={`px-4 py-2 text-xs font-normal text-gray-600 ${alignClass(col.align)} ${col.width || ''}`}
+                    scope="col"
+                  >
                     {col.filterRender ?? null}
                   </th>
                 ))}

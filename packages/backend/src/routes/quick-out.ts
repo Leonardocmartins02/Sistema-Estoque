@@ -98,4 +98,65 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Histórico geral de baixas (movimentos OUT)
+router.get('/history', async (req, res) => {
+  const page = Math.max(Number(req.query.page || 1), 1);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 20), 1), 100);
+  const q = String(req.query.q || '').trim(); // busca por nome, sku ou note
+  const from = String(req.query.from || '').trim();
+  const to = String(req.query.to || '').trim();
+
+  // Filtro base: apenas saídas (OUT)
+  const whereBase: any = { type: 'OUT' };
+
+  if (from) {
+    const d = new Date(from);
+    if (!isNaN(d.getTime())) {
+      whereBase.date = { ...(whereBase.date || {}), gte: d };
+    }
+  }
+  if (to) {
+    const d = new Date(to);
+    if (!isNaN(d.getTime())) {
+      whereBase.date = { ...(whereBase.date || {}), lte: d };
+    }
+  }
+
+  // Se tiver termo de busca, fazemos em memória após join para nome/sku
+  const [itemsRaw, totalRaw] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where: whereBase,
+      include: { product: true },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.stockMovement.count({ where: whereBase }),
+  ]);
+
+  const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filtered = q
+    ? itemsRaw.filter((m) => {
+        const term = normalize(q);
+        const name = normalize(m.product?.name || '');
+        const sku = normalize(m.product?.sku || '');
+        const note = normalize(m.note || '');
+        return name.includes(term) || sku.includes(term) || note.includes(term);
+      })
+    : itemsRaw;
+
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const pageItems = filtered.slice(start, end).map((m) => ({
+    id: m.id,
+    productId: m.productId,
+    productName: m.product?.name || '',
+    productSku: m.product?.sku || '',
+    quantity: m.quantity,
+    date: m.date,
+    note: m.note || null,
+  }));
+
+  res.json({ items: pageItems, total, page, pageSize });
+});
+
 export default router;
