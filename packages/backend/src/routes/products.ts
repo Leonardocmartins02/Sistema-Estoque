@@ -7,11 +7,17 @@ const router = Router();
 router.get('/', async (req, res) => {
   const search = String(req.query.search || '').trim();
   const page = Math.max(Number(req.query.page || 1), 1);
-  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 10), 1), 50);
+  // Suporta pageSize=0 (retorna todos) e aumenta limite máximo para 1000
+  const rawPageSize = Number(req.query.pageSize ?? 10);
+  const pageSize = rawPageSize === 0 ? 0 : Math.min(Math.max(rawPageSize, 1), 1000);
   const sortByRaw = String(req.query.sortBy || 'name');
   const sortDirRaw = String(req.query.sortDir || 'asc');
   const sortBy = ['name', 'sku', 'balance'].includes(sortByRaw) ? (sortByRaw as 'name' | 'sku' | 'balance') : 'name';
   const sortDir = sortDirRaw === 'desc' ? 'desc' : 'asc';
+  const statusParam = String(req.query.status || '').trim();
+  const statusFilter = statusParam
+    ? statusParam.split(',').map((s) => s.toUpperCase()).filter((s) => ['OK', 'ATTN', 'OUT'].includes(s)) as Array<'OK'|'ATTN'|'OUT'>
+    : [];
 
   // Normalize function to remove diacritics and lowercase
   const normalize = (s: string) =>
@@ -45,8 +51,19 @@ router.get('/', async (req, res) => {
     })
   );
 
+  // Optional status filtering before sorting/pagination
+  const filteredByStatus = statusFilter.length === 0
+    ? productsWithBalance
+    : productsWithBalance.filter((p) => {
+        const isOut = p.balance === 0;
+        const isAttn = p.balance > 0 && p.balance < p.minStock;
+        const isOk = p.balance >= p.minStock;
+        const map: Record<'OK'|'ATTN'|'OUT', boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
+        return statusFilter.some((s) => map[s]);
+      });
+
   // Sort according to sortBy/sortDir
-  const sorted = [...productsWithBalance].sort((a, b) => {
+  const sorted = [...filteredByStatus].sort((a, b) => {
     let av: string | number = '';
     let bv: string | number = '';
     if (sortBy === 'name') {
@@ -65,13 +82,22 @@ router.get('/', async (req, res) => {
     return 0;
   });
 
-  // Pagination in memory (sufficient for small datasets)
+  // Paginação em memória (para datasets pequenos). Se pageSize=0, retorna todos
   const total = sorted.length;
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
-  const items = sorted.slice(start, end);
+  let items = sorted;
+  let respPage = page;
+  let respPageSize = pageSize;
+  if (pageSize !== 0) {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    items = sorted.slice(start, end);
+  } else {
+    // quando retornando todos, padroniza page=1
+    respPage = 1;
+    respPageSize = 0;
+  }
 
-  res.json({ items, total, page, pageSize });
+  res.json({ items, total, page: respPage, pageSize: respPageSize });
 });
 
 const productSchema = z.object({

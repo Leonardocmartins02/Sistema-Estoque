@@ -28,8 +28,8 @@ export function ProductDashboard() {
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [page, setPage] = useState(1);
-  // Exibir todos os produtos: usar um pageSize alto
-  const [pageSize, setPageSize] = useState(1000);
+  // Paginação padrão: 10 itens por página
+  const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [tableSorts, setTableSorts] = useState<Sort[]>([{ by: 'name', dir: 'asc' }]);
@@ -256,28 +256,19 @@ export function ProductDashboard() {
   }
 
   const query = useQuery<Paged<ProductWithBalance>>({
-    queryKey: ['products', debounced, page, pageSize, sortBy, sortDir],
-    queryFn: () => fetchProducts(debounced, page, pageSize, sortBy, sortDir),
+    queryKey: ['products', debounced, page, pageSize, sortBy, sortDir, statusFilter.join(',')],
+    queryFn: () => fetchProducts(debounced, page, pageSize, sortBy, sortDir, statusFilter.length ? (statusFilter as any) : undefined),
     staleTime: 15_000,
   });
 
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
   const total = query.data?.total ?? 0;
-  const currentPage = 1;
-  const currentPageSize = pageSize;
-  const totalPages = 1;
+  const currentPage = query.data?.page ?? page;
+  const currentPageSize = query.data?.pageSize ?? pageSize;
+  const totalPages = Math.max(Math.ceil(total / currentPageSize), 1);
 
-  // Aplica filtro de status (multi-seleção) no client-side sobre a página corrente
-  const filteredItems = useMemo(() => {
-    return items.filter((p) => {
-      const isOut = p.balance === 0;
-      const isAttn = p.balance > 0 && p.balance < p.minStock;
-      const isOk = p.balance >= p.minStock;
-      const statuses: Record<StatusKey, boolean> = { OK: isOk, ATTN: isAttn, OUT: isOut };
-      const statusOk = statusFilter.length === 0 || statusFilter.some((k) => statuses[k]);
-      return statusOk;
-    });
-  }, [items, statusFilter]);
+  // Itens já vêm filtrados pelo backend conforme statusFilter
+  const filteredItems = items;
 
   // Aplicar ordenação múltipla client-side adicional (além da primária do backend)
   const viewItems = useMemo(() => {

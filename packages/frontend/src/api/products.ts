@@ -11,6 +11,7 @@ export async function fetchProducts(
   pageSize = 10,
   sortBy: 'name' | 'sku' | 'balance' = 'name',
   sortDir: 'asc' | 'desc' = 'asc',
+  status?: Array<'OK' | 'ATTN' | 'OUT'>,
 ): Promise<{ items: ProductWithBalance[]; total: number; page: number; pageSize: number }> {
   const term = search.trim();
   const params = new URLSearchParams();
@@ -19,6 +20,7 @@ export async function fetchProducts(
   params.set('pageSize', String(pageSize));
   params.set('sortBy', sortBy);
   params.set('sortDir', sortDir);
+  if (status && status.length > 0) params.set('status', status.join(','));
   const qs = params.toString();
   const url = `${API_PREFIX}/products?${qs}`;
 

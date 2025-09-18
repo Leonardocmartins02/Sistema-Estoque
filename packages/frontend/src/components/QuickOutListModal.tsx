@@ -1,9 +1,10 @@
 import { createPortal } from 'react-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Card from './ui/Card';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import type { ProductWithBalance } from '../api/types';
+import { fetchProducts } from '../api/products';
 
 export type QuickOutListModalProps = {
   open: boolean;
@@ -18,41 +19,30 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
   if (!open) return null;
 
   const [query, setQuery] = useState('');
-  const normalize = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-
-  // Estado de ordenação clicável no cabeçalho (sem filtro por status no header)
   type SortDir = 'asc' | 'desc';
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  const rows = useMemo(() => {
-    const q = normalize(query.trim());
-    let filtered = items.filter((p) => {
-      return !q || normalize(p.name).includes(q) || normalize(p.sku).includes(q);
-    });
-    // Ordenação simples client-side
-    filtered = [...filtered].sort((a, b) => {
-      let av: any = sortBy === 'balance' ? a.balance : sortBy === 'sku' ? a.sku : a.name;
-      let bv: any = sortBy === 'balance' ? b.balance : sortBy === 'sku' ? b.sku : b.name;
-      if (typeof av === 'string') av = av.toLowerCase();
-      if (typeof bv === 'string') bv = bv.toLowerCase();
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return filtered;
-  }, [items, query, sortBy, sortDir]);
-
-  // Paginação local
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const totalPages = Math.max(Math.ceil(rows.length / pageSize), 1);
-  const start = (page - 1) * pageSize;
-  const pageItems = rows.slice(start, start + pageSize);
+  const [pageSize] = useState(10);
+  const [rows, setRows] = useState<ProductWithBalance[]>([]);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetchProducts(query, page, pageSize, sortBy, sortDir);
+        setRows(res.items);
+        setTotal(res.total);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [open, query, page, pageSize, sortBy, sortDir]);
+
+  const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
   const content = (
     <div className="fixed inset-0 z-[10000] p-4 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onOpenChange(false)}>
@@ -81,7 +71,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
               autoFocus
             />
             <div className="text-xs text-gray-500 whitespace-nowrap">
-              {loading ? '...' : `${rows.length} item(ns)`}
+              {isLoading ? '...' : `${total} item(ns)`}
             </div>
           </div>
           <div className="overflow-hidden rounded-lg border bg-white">
@@ -93,6 +83,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-gray-800"
                       onClick={() => {
+                        setPage(1);
                         setSortBy('name');
                         setSortDir((d) => (sortBy === 'name' ? (d === 'asc' ? 'desc' : 'asc') : 'asc'));
                       }}
@@ -107,6 +98,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-gray-800"
                       onClick={() => {
+                        setPage(1);
                         setSortBy('sku');
                         setSortDir((d) => (sortBy === 'sku' ? (d === 'asc' ? 'desc' : 'asc') : 'asc'));
                       }}
@@ -121,6 +113,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-gray-800"
                       onClick={() => {
+                        setPage(1);
                         setSortBy('balance');
                         setSortDir((d) => (sortBy === 'balance' ? (d === 'asc' ? 'desc' : 'asc') : 'asc'));
                       }}
@@ -139,7 +132,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {isLoading ? (
                   <tr>
                     <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">Carregando produtos...</td>
                   </tr>
@@ -148,7 +141,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                     <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">Nenhum produto disponível.</td>
                   </tr>
                 ) : (
-                  pageItems.map((p) => {
+                  rows.map((p) => {
                     const isOut = p.balance === 0;
                     const isAttn = p.balance > 0 && p.balance < p.minStock;
                     const isOk = p.balance >= p.minStock;
