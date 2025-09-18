@@ -42,6 +42,124 @@ export function ProductDashboard() {
       return [{ by: key, dir: primary.dir === 'asc' ? 'desc' : 'asc' }, ...curr.slice(1)];
     });
   };
+
+  // Cabeçalho de filtro de Status com menu em portal fixo (evita clipping/sobreposição)
+  function StatusFilterHeader() {
+    const [open, setOpen] = useState(false);
+    const [pos, setPos] = useState<{ top?: number; bottom?: number; left?: number } | null>(null);
+
+    const onOpen = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const preferredTop = rect.bottom + 8;
+      const preferredLeft = rect.right - 256; // ~ w-64
+      const estimatedHeight = 240;
+      const willOverflowBottom = preferredTop + estimatedHeight > window.innerHeight;
+      const top = willOverflowBottom ? undefined : preferredTop;
+      const bottom = willOverflowBottom ? window.innerHeight - rect.top + 8 : undefined;
+      const left = Math.max(8, preferredLeft);
+      setPos({ top, bottom, left });
+      setOpen(true);
+    };
+
+    useEffect(() => {
+      if (!open) return;
+      const close = () => setOpen(false);
+      const onKey = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') setOpen(false);
+      };
+      window.addEventListener('mousedown', close);
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('resize', close);
+      window.addEventListener('scroll', close, true);
+      return () => {
+        window.removeEventListener('mousedown', close);
+        window.removeEventListener('keydown', onKey);
+        window.removeEventListener('resize', close);
+        window.removeEventListener('scroll', close, true);
+      };
+    }, [open]);
+
+    return (
+      <>
+        <button
+          type="button"
+          className="group inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold tracking-wide text-gray-700 shadow-sm hover:bg-white hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          onClick={onOpen}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title="Filtrar por Status"
+        >
+          <span className="select-none">Status</span>
+          {statusFilter.length > 0 && (
+            <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
+              {statusFilter.length}
+            </span>
+          )}
+          <ChevronDown className={`h-3.5 w-3.5 text-gray-500 transition-transform group-hover:text-gray-700 ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open && pos && createPortal(
+          <div
+            role="menu"
+            aria-label="Filtrar status"
+            className="z-[10000] w-64 select-none rounded-xl border border-gray-200 bg-white/95 p-3 text-xs shadow-xl backdrop-blur-sm ring-1 ring-black/5"
+            style={{ position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left }}
+            onMouseDown={(e)=>e.stopPropagation()}
+          >
+            <div className="mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Filtrar Status</div>
+              <div className="mt-0.5 text-[11px] text-gray-400">Selecione um ou mais estados.</div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ['OK','OK','bg-emerald-500'],
+                ['ATTN','Atenção','bg-amber-500'],
+                ['OUT','Em falta','bg-rose-500'],
+              ] as const).map(([val,label,color])=> {
+                const active = statusFilter.includes(val as any);
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => { toggleStatus(val as any); setPage(1); }}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition ${
+                      active
+                        ? 'border-transparent bg-indigo-600 text-white shadow-sm'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    aria-pressed={active}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden="true" />
+                    <span>{label}</span>
+                    {active && <Check className="h-3.5 w-3.5 opacity-90" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                onClick={()=>{ setStatusFilter([]); setPage(1); }}
+                title="Limpar filtros"
+              >
+                Limpar filtros
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                onClick={()=> setOpen(false)}
+                title="Fechar"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
+    );
+  }
   const qc = useQueryClient();
   const [openMove, setOpenMove] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
@@ -555,17 +673,6 @@ export function ProductDashboard() {
               footer={
                 <div className="flex flex-wrap items-center justify-end gap-3">
                   <div className="flex items-center gap-2">
-                    <Select
-                      aria-label="Itens por página"
-                      value={currentPageSize}
-                      onChange={(e) => {
-                        const next = Number(e.target.value);
-                        setPageSize(next);
-                        setPage(1);
-                      }}
-                      options={[10, 20, 50].map((n) => ({ value: n, label: `${n}/página` }))}
-                      className="w-[130px]"
-                    />
                     <button
                       type="button"
                       className="rounded-full border px-3.5 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"

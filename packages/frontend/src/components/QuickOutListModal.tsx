@@ -175,13 +175,6 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xs text-gray-500">Página {page} de {totalPages}</div>
             <div className="flex items-center gap-2">
-              <select
-                className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                value={pageSize}
-                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-              >
-                {[10,20,50].map(n => <option key={n} value={n}>{n}/página</option>)}
-              </select>
               <Button variant="ghost" onClick={() => setPage((p) => Math.max(1, p-1))} disabled={page<=1}>Anterior</Button>
               <Button variant="ghost" onClick={() => setPage((p) => Math.min(totalPages, p+1))} disabled={page>=totalPages}>Próxima</Button>
             </div>
