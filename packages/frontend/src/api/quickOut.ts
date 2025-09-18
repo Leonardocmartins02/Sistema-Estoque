@@ -11,6 +11,37 @@ export interface QuickOutRequest {
   note?: string;
 }
 
+export interface QuickOutHistoryItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  date: string;
+  note: string | null;
+}
+
+export async function fetchQuickOutHistory(params: {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  from?: string; // ISO
+  to?: string; // ISO
+}): Promise<{ items: QuickOutHistoryItem[]; total: number; page: number; pageSize: number }> {
+  const sp = new URLSearchParams();
+  if (params.page) sp.set('page', String(params.page));
+  if (params.pageSize) sp.set('pageSize', String(params.pageSize));
+  if (params.q) sp.set('q', params.q);
+  if (params.from) sp.set('from', params.from);
+  if (params.to) sp.set('to', params.to);
+  const res = await fetch(`${API_PREFIX}/quick-out/history?${sp.toString()}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.message || 'Falha ao carregar histórico de baixas');
+  }
+  return res.json();
+}
+
 export interface QuickOutResponse {
   success: boolean;
   movement: {
