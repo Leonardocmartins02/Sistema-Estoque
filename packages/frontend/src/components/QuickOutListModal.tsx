@@ -24,25 +24,15 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
-  // Estado de ordenação e filtro clicáveis no cabeçalho
+  // Estado de ordenação clicável no cabeçalho (sem filtro por status no header)
   type SortDir = 'asc' | 'desc';
   const [sortBy, setSortBy] = useState<'name' | 'sku' | 'balance'>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  type StatusKey = 'ALL' | 'OK' | 'ATTN' | 'OUT';
-  const [statusCycle, setStatusCycle] = useState<StatusKey>('ALL');
 
   const rows = useMemo(() => {
     const q = normalize(query.trim());
     let filtered = items.filter((p) => {
-      const matchesQuery = !q || normalize(p.name).includes(q) || normalize(p.sku).includes(q);
-      if (statusCycle === 'ALL') return matchesQuery;
-      const isOut = p.balance === 0;
-      const isAttn = p.balance > 0 && p.balance < p.minStock;
-      const isOk = p.balance >= p.minStock;
-      if (statusCycle === 'OK') return matchesQuery && isOk;
-      if (statusCycle === 'ATTN') return matchesQuery && isAttn;
-      if (statusCycle === 'OUT') return matchesQuery && isOut;
-      return matchesQuery;
+      return !q || normalize(p.name).includes(q) || normalize(p.sku).includes(q);
     });
     // Ordenação simples client-side
     filtered = [...filtered].sort((a, b) => {
@@ -55,7 +45,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
       return 0;
     });
     return filtered;
-  }, [items, query, statusCycle, sortBy, sortDir]);
+  }, [items, query, sortBy, sortDir]);
 
   // Paginação local
   const [page, setPage] = useState(1);
@@ -98,7 +88,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
             <table className="min-w-full table-fixed">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-600 w-[45%]">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-600 w-[40%]">
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-gray-800"
@@ -126,7 +116,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                       <span className={`text-gray-400 ${sortBy==='sku' && sortDir==='desc' ? 'rotate-180' : ''}`}>▲</span>
                     </button>
                   </th>
-                  <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-600 w-[15%]">
+                  <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-600 w-[12%]">
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-gray-800"
@@ -140,20 +130,11 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                       <span className={`text-gray-400 ${sortBy==='balance' && sortDir==='desc' ? 'rotate-180' : ''}`}>▲</span>
                     </button>
                   </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-600 w-[13%]">
+                    Mín. Estoque
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-600 w-[20%]">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-2 hover:text-gray-800"
-                      onClick={() => {
-                        setStatusCycle((prev) => (prev === 'ALL' ? 'OK' : prev === 'OK' ? 'ATTN' : prev === 'ATTN' ? 'OUT' : 'ALL'));
-                      }}
-                      title="Filtrar por Status (clique para alternar)"
-                    >
-                      Status
-                      <span className="rounded-full border px-2 py-0.5 text-[10px] text-gray-600">
-                        {statusCycle === 'ALL' ? 'Todos' : statusCycle === 'OK' ? 'OK' : statusCycle === 'ATTN' ? 'Atenção' : 'Em falta'}
-                      </span>
-                    </button>
+                    Status
                   </th>
                 </tr>
               </thead>
@@ -176,6 +157,7 @@ export default function QuickOutListModal({ open, onOpenChange, items, onPick, l
                         <td className="border-t border-gray-100 px-4 py-3 text-sm text-gray-800">{p.name}</td>
                         <td className="border-t border-gray-100 px-4 py-3 text-sm text-gray-600 uppercase">{p.sku}</td>
                         <td className="border-t border-gray-100 px-4 py-3 text-sm text-gray-800 text-right">{p.balance} <span className="text-gray-500">un.</span></td>
+                        <td className="border-t border-gray-100 px-4 py-3 text-sm text-gray-800 text-right">{p.minStock} <span className="text-gray-500">un.</span></td>
                         <td className="border-t border-gray-100 px-4 py-3 text-sm">
                           {isOk && <Badge variant="success">Em Estoque</Badge>}
                           {isAttn && <Badge variant="warning">Estoque Baixo</Badge>}
